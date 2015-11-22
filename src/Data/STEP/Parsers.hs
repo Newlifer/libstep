@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Step (
+module Data.STEP.Parsers (
   Vector(..)
 
 , parseStep

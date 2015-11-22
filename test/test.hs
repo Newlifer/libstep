@@ -5,7 +5,7 @@ import Test.Tasty.Hspec
 import Data.Attoparsec.ByteString.Char8
 import qualified Data.ByteString.Char8 as C8
 
-import Step
+import Data.STEP.Parsers
 
 main :: IO ()
 main = do
