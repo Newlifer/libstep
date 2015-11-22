@@ -28,5 +28,5 @@
 *.app
 
 # VIM swap files
-*.swp
+*.s??
 /.stack-work/
