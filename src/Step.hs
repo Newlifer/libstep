@@ -1,10 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Express where
+module Step (
+  Vector(..)
+
+, parseStep
+) where
 
 import Data.Attoparsec.ByteString.Char8
 import Data.Word
 
-data Vector = Vector [Double] deriving Show
+data Vector = Vector [Double]
+  deriving (Show, Eq)
 
 delimiter :: Char
 delimiter = ','
@@ -34,3 +39,6 @@ parseVector = do
     result <- parseVectorElement `sepBy` (char delimiter)
     char groupFinish
     return $ Vector result
+
+parseStep :: Parser Vector
+parseStep = parseVector
