@@ -1,0 +1,44 @@
+name:                libstep
+version:             0.1.0.0
+synopsis:            Read and write STEP files
+description:
+ STEP files can represent 3D objects in computer-aided design and related
+ information. This package provides functions to read EXPRESS schemas and
+ STEP objects described according to them, and also functions to construct and
+ write new STEP objects.
+homepage:            https://github.com/Newlifer/libstep#readme
+license:             MIT
+license-file:        LICENSE
+author:              Alex Novozhilov
+maintainer:          Alex Novozhilov, Alexander Batischev <eual.jp@gmail.com>
+copyright:           2015 Alex Novozhilov, Alexander Batischev
+category:            File
+build-type:          Simple
+-- extra-source-files:
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Step
+  build-depends:       base >= 4.7 && < 5
+                     , attoparsec
+  default-language:    Haskell2010
+
+test-suite libstep-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             test.hs
+  build-depends:       base
+                     , libstep
+
+                     , attoparsec
+                     , bytestring
+                     , hspec-attoparsec
+                     , tasty
+                     , tasty-hspec
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+
+source-repository head
+  type:     git
+  location: https://github.com/Newlifer/libstep
