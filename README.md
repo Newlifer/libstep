@@ -2,6 +2,8 @@
 
 STEP file reading/writing library
 
+**NOTE:** this implementation is **NOT** certified.
+
 STEP is described in ISO standard (ISO 10303-21) and Russian GOST (ГОСТ Р ИСО
 10303-21). EXPRESS is described in ISO 10303-11 and ГОСТ ИСО Р 10303-11.
 
