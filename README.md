@@ -1,6 +1,6 @@
 # libstep
 
-## Desciption (ENG)
+## Description (ENG)
 
 STEP file reading/writing library.
 **NOTE:** this implementation is **NOT** certified.
