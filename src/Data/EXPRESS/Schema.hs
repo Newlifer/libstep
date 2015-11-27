@@ -24,10 +24,10 @@ type SchemaVersionId = StringLiteral
 
 -- { interface_specification } [ constant_decl ] { declaration | rule_decl } .
 data SchemaBody = SchemaBody {
-  interfaces    :: [InterfaceSpecification]
+  interfaces    :: Maybe [InterfaceSpecification]
 , constant      :: Maybe ConstantDecl
-, declaractions :: [Declaration]
-, rules         :: [RuleDecl]
+, declaractions :: Maybe [Declaration]
+, rules         :: Maybe [RuleDecl]
 }
 
 -- letter { letter | digit | ' _ ' } .
@@ -108,7 +108,7 @@ type TypeId = SimpleId
 
 -- CONSTANT constant_body { constant_body } END_CONSTANT ' ; ' .
 data ConstantDecl = ConstantDecl {
-  cbody :: [ConstantBody]
+  cbody :: Maybe [ConstantBody]
 }
 
 -- constant_id ' : ' instantiable_type ' := ' expression ' ; ' .
@@ -258,7 +258,7 @@ data UniqueClause = UniqueClause {
 -- [ rule_label_id ' : ' ] referenced_attribute { ' , ' referenced_attribute } .
 data UniqueRule = UniqueRule {
   ruleLabelId :: Maybe RuleLabelId
-, attrs :: [ReferencedAttribute]
+, attrs       :: [ReferencedAttribute]
 }
 
 -- attribute_ref | qualified_attribute .
@@ -474,7 +474,6 @@ instance Literal RealLiteral
 instance Literal StringLiteral
 
 -- nteger_literal | ( digits ' . ' [ digits ] [ ' e ' [ sign ] digits ] ) .
--- TODO: is this okay, or should we implement proper AST?
 data RealLiteral = RealLiteral Double
 
 -- FALSE | TRUE | UNKNOWN .
@@ -558,7 +557,7 @@ data Element = Element {
 type Repetition = NumericExpression
 
 -- ' * ' | ' / ' | DIV | MOD | AND | ' || ' .
--- Or is ||
+-- `Or` is `||`
 data MultiplicationLikeOp = Times | Divide | DIV | MOD | AND | Or
 
 -- ' + ' | ' - ' | OR | XOR .
@@ -572,7 +571,7 @@ instance AttributeDecl RedeclaredAttribute
 -- qualified_attribute [ RENAMED attribute_id ] .
 data RedeclaredAttribute = RedeclaredAttribute {
   qualifiedAttribute :: QualifiedAttribute
-, attributeId :: Maybe AttributeId
+, attributeId        :: Maybe AttributeId
 }
 
 -- DERIVE derived_attr { derived_attr } .
@@ -692,7 +691,7 @@ instance ConstructedTypes SelectType
 
 -- [ EXTENSIBLE [ GENERIC_ENTITY ] ] SELECT [ select_list | select_extension ] .
 data SelectType = SelectType {
-  extensibleGenericEntity :: Maybe (Extensible GenericEntity)
+  extensibleGenericEntity :: Maybe (Extensible (Maybe GenericEntity))
 , sTBody                  :: Maybe (Either SelectList SelectExtension)
 }
 
@@ -742,9 +741,9 @@ data SubtypeConstraintHead = SubtypeConstraintHead {
 
 -- [ abstract_supertype ] [ total_over ] [ supertype_expression ' ; ' ] .
 data SubtypeConstraintBody = SubtypeConstraintBody {
-  sCBAbstractSupertype   :: AbstractSupertype
-, sCBTotalOver           :: TotalOver
-, sCBSupertypeExpression :: SupertypeExpression
+  sCBAbstractSupertype   :: Maybe AbstractSupertype
+, sCBTotalOver           :: Maybe TotalOver
+, sCBSupertypeExpression :: Maybe SupertypeExpression
 }
 
 -- TOTAL_OVER ' ( ' entity_ref { ' , ' entity_ref } ' ) ' ' ; ' .
@@ -769,10 +768,10 @@ data ProcedureDecl = ProcedureDecl {
 data Stmt =
     -- ALIAS variable_id FOR general_ref { qualifier } ' ; ' stmt { stmt } END_ALIAS ' ; ' .
     AliasStmt {
-      aSVariableId :: VariableId
+      aSVariableId  :: VariableId
     , alSGeneralRef :: GeneralRef
     , alSQualifiers :: Maybe [Qualifier]
-    , aSStatements :: [Stmt]
+    , aSStatements  :: [Stmt]
     }
 
     -- general_ref { qualifier } ' := ' expression ' ; ' .
@@ -830,9 +829,9 @@ data Stmt =
 
 -- [ increment_control ] [ while_control ] [ until_control ] .
 data RepeatControl = RepeatControl {
-  incrementControl :: IncrementControl
-, whileControl     :: WhileControl
-, untilControl     :: UntilControl
+  incrementControl :: Maybe IncrementControl
+, whileControl     :: Maybe WhileControl
+, untilControl     :: Maybe UntilControl
 }
 
 -- UNTIL logical_expression .
@@ -895,12 +894,14 @@ data LocalVariable = LocalVariable {
 
 -- PROCEDURE procedure_id [ ' ( ' [ VAR ] formal_parameter { ' ; ' [ VAR ] formal_parameter } ' ) ' ] ' ; ' .
 data ProcedureHead = ProcedureHead {
-  procedureId :: ProcedureId
+  procedureId     :: ProcedureId
 , procedureParams :: Maybe [ProcedureParam]
 }
 
 data ProcedureParam = ProcedureParam {
-  var             :: Bool
+  -- `modifiable` is True if and only if this parameter was preceded with `VAR`
+  -- in procedure's parameters declaration
+  modifiable      :: Bool
 , formalParameter :: FormalParameter
 }
 
@@ -921,6 +922,7 @@ data FunctionDecl = FunctionDecl {
 data FunctionHead = FunctionHead {
   fHFunctionId       :: FunctionId
 , fHFormalParameters :: Maybe [FormalParameter]
+, fHReturnType       :: ParameterType
 }
 
 -- rel_op | IN | LIKE .
