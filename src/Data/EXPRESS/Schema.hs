@@ -6,7 +6,7 @@ module Schema where
 
 import Data.Text (Text)
 
-syntax = schema_decl { schema_decl } .
+-- schema_decl { schema_decl } .
 data Express = Express [Schema]
 
 -- SCHEMA schema_id [ schema_version_id ] ' ; ' schema_body END_SCHEMA ' ; ' .
@@ -474,7 +474,7 @@ instance Literal RealLiteral
 instance Literal StringLiteral
 
 -- nteger_literal | ( digits ' . ' [ digits ] [ ' e ' [ sign ] digits ] ) .
-data RealLiteral = RealLiteral Double
+data RealLiteral = RealLiteral
 
 -- FALSE | TRUE | UNKNOWN .
 data LogicalLiteral = FALSE | TRUE | UNKNOWN
@@ -539,12 +539,12 @@ type EnumerationId = SimpleId
 -- entity_ref ' ( ' [ expression { ' , ' expression } ] ' ) ' .
 data EntityConstructor = EntityConstructor {
   entityRef   :: EntityRef
-, expressions :: [Expression]
+, expressions :: Maybe [Expression]
 }
 
 -- ' [ ' [ element { ' , ' element } ] ' ] ' .
 data AggregateInitializer = AggregateInitializer {
-  elements :: [Element]
+  elements :: Maybe [Element]
 }
 
 -- expression [ ' : ' repetition ] .
@@ -1005,7 +1005,7 @@ data ArrayType = ArrayType {
 -- USE FROM schema_ref [ ' ( ' named_type_or_rename { ' , ' named_type_or_rename } ' ) ' ] ' ; ' .
 data UseClause = UseClause {
   uCSchemaRef         :: SchemaRef
-, namedTypesOrRenames :: [NamedTypeOrRename]
+, namedTypesOrRenames :: Maybe [NamedTypeOrRename]
 }
 
 -- named_types [ AS ( entity_id | type_id ) ] .
