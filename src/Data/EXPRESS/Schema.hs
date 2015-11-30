@@ -1,3 +1,8 @@
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 module Schema where
 
 {- Lists are implied to be one or more elements long. If list can be empty, we
@@ -41,15 +46,18 @@ type SimpleId = Text
 type StringLiteral = Text
 
 -- reference_clause | use_clause .
-class InterfaceSpecification a
-instance InterfaceSpecification ReferenceClause
-instance InterfaceSpecification UseClause
+data InterfaceSpecification =
+    -- REFERENCE FROM schema_ref [ ' ( ' resource_or_rename { ' , ' resource_or_rename } ' ) ' ] ' ; ' .
+    ReferenceClause {
+      schemaRef :: SchemaRef
+    , resources :: Maybe [ResourceOrRename]
+    }
+    -- USE FROM schema_ref [ ' ( ' named_type_or_rename { ' , ' named_type_or_rename } ' ) ' ] ' ; ' .
+  | UseClause {
+      uCSchemaRef         :: SchemaRef
+    , namedTypesOrRenames :: Maybe [NamedTypeOrRename]
+    }
 
--- REFERENCE FROM schema_ref [ ' ( ' resource_or_rename { ' , ' resource_or_rename } ' ) ' ] ' ; ' .
-data ReferenceClause = ReferenceClause {
-  schemaRef :: SchemaRef
-, resources :: Maybe [ResourceOrRename]
-}
 
 -- schema_id .
 type SchemaRef = SchemaId
@@ -61,12 +69,10 @@ data ResourceOrRename = ResourceOrRename {
 }
 
 -- constant_ref | entity_ref | function_ref | procedure_ref | type_ref .
-class ResourceRef a
-instance ResourceRef ConstantRef
-instance ResourceRef EntityRef
-instance ResourceRef FunctionRef
-instance ResourceRef ProcedureRef
-instance ResourceRef TypeRef
+--
+-- Since all refs are mapped into ids, which in turn are equivalent to
+-- simple_id, we just skip to the end.
+type ResourceRef = SimpleId
 
 -- constant_id .
 type ConstantRef = ConstantId
@@ -84,12 +90,10 @@ type ProcedureRef = ProcedureId
 type TypeRef = TypeId
 
 -- constant_id | entity_id | function_id | procedure_id | type_id .
-class RenameId a
-instance RenameId ConstantId
-instance RenameId EntityId
-instance RenameId FunctionId
-instance RenameId ProcedureId
-instance RenameId TypeId
+--
+-- In the end, all the IDs are SimpleId, so let's just skip the intermediate
+-- step.
+type RenameId = SimpleId
 
 -- simple_id .
 type ConstantId = SimpleId
@@ -119,32 +123,47 @@ data ConstantBody = ConstantBody {
 }
 
 -- concrete_types | entity_ref .
-class InstantiableType a
-instance ConcreteTypes a => InstantiableType a
-instance InstantiableType EntityRef
+class CInstantiableType a
+instance ConcreteTypes a => CInstantiableType a
+instance CInstantiableType EntityRef
+
+data InstantiableType = forall a. CInstantiableType a => InstantiableType a
 
 -- aggregation_types | simple_types | type_ref .
 class ConcreteTypes a
 instance AggregationTypes a => ConcreteTypes a
-instance SimpleTypes a => ConcreteTypes a
+instance ConcreteTypes SimpleTypes
 instance ConcreteTypes TypeRef
 
 -- array_type | bag_type | list_type | set_type .
 class AggregationTypes a
-instance AggregationTypes (ArrayType b)
-instance AggregationTypes (BagType b)
-instance AggregationTypes (ListType b)
-instance AggregationTypes (SetType b)
+instance AggregationTypes ArrayType
+instance AggregationTypes BagType
+instance AggregationTypes ListType
+instance AggregationTypes SetType
 
 -- binary_type | boolean_type | integer_type | logical_type | number_type | real_type | string_type .
-class SimpleTypes a
-instance SimpleTypes BinaryType
-instance SimpleTypes BooleanType
-instance SimpleTypes IntegerType
-instance SimpleTypes LogicalType
-instance SimpleTypes NumberType
-instance SimpleTypes RealType
-instance SimpleTypes StringType
+data SimpleTypes =
+    -- BINARY [ width_spec ] .
+    BinaryType {
+      bTWidthSpec :: Maybe WidthSpec
+    }
+    -- BOOLEAN .
+  | BooleanType
+    -- INTEGER .
+  | IntegerType
+    -- LOGICAL .
+  | LogicalType
+    -- NUMBER .
+  | NumberType
+    -- REAL [ ' ( ' precision_spec ' ) ' ] .
+  | RealType {
+      precisionSpec :: Maybe PrecisionSpec
+    }
+    -- STRING [ width_spec ] .
+  | StringType {
+      widthSpec :: Maybe WidthSpec
+    }
 
 -- simple_expression [ rel_op_extended simple_expression ] .
 data Expression where
@@ -152,18 +171,38 @@ data Expression where
   EOp :: SimpleExpression -> RelOpExtended -> SimpleExpression -> Expression
 
 -- entity_decl | function_decl | procedure_decl | subtype_constraint_decl | type_decl .
-class Declaration a
-instance Declaration EntityDecl
-instance Declaration FunctionDecl
-instance Declaration ProcedureDecl
-instance Declaration SubtypeConstraintDecl
-instance Declaration TypeDecl
+data Declaration =
+    -- entity_head entity_body END_ENTITY ' ; ' .
+    EntityDecl {
+      ehead :: EntityHead
+    , ebody :: EntityBody
+    }
+    -- function_head algorithm_head stmt { stmt } END_FUNCTION ' ; ' .
+  | FunctionDecl {
+      fDFunctionHead  :: FunctionHead
+    , fDAlgorithmHead :: AlgorithmHead
+    , fDStatements    :: [Stmt]
+    }
 
--- entity_head entity_body END_ENTITY ' ; ' .
-data EntityDecl = EntityDecl {
-  ehead :: EntityHead
-, ebody :: EntityBody
-}
+    -- procedure_head algorithm_head { stmt } END_PROCEDURE ' ; ' .
+  | ProcedureDecl {
+      procedureHead :: ProcedureHead
+    , algorithmHead :: AlgorithmHead
+    , stmts         :: Maybe [Stmt]
+    }
+
+    -- subtype_constraint_head subtype_constraint_body END_SUBTYPE_CONSTRAINT ' ; ' .
+  | SubtypeConstraintDecl {
+      subtypeConstraintHead :: SubtypeConstraintHead
+    , subtypeConstraintBody :: SubtypeConstraintBody
+    }
+
+    -- TYPE type_id ' = ' underlying_type ' ; ' [ where_clause ] END_TYPE ' ; ' .
+  | TypeDecl {
+      tDTypeId       :: TypeId
+    , underlyingType :: UnderlyingType
+    , whereClause    :: Maybe WhereClause
+    }
 
 -- ENTITY entity_id subsuper ' ; ' .
 data EntityHead = EntityHead {
@@ -187,23 +226,19 @@ data SubSuper = SubSuper {
 }
 
 -- abstract_entity_declaration | abstract_supertype_declaration | supertype_rule .
-class SupertypeConstraint a
-instance SupertypeConstraint AbstractEntityDeclaration
-instance SupertypeConstraint AbstractSupertypeDeclaration
-instance SupertypeConstraint SupertypeRule
+data SupertypeConstraint =
+    -- ABSTRACT .
+    AbstractEntityDeclaration
 
--- ABSTRACT .
-data AbstractEntityDeclaration = AbstractEntityDeclaration
+    -- ABSTRACT SUPERTYPE [ subtype_constraint ] .
+  | AbstractSupertypeDeclaration {
+      subtypeConstraint :: Maybe SubtypeConstraint
+    }
 
--- ABSTRACT SUPERTYPE [ subtype_constraint ] .
-data AbstractSupertypeDeclaration = AbstractSupertypeDeclaration {
-  subtypeConstraint :: Maybe SubtypeConstraint
-}
-
--- SUPERTYPE subtype_constraint .
-data SupertypeRule = SupertypeRule {
-  srSubtypeConstraint :: SubtypeConstraint
-}
+    -- SUPERTYPE subtype_constraint .
+  | SupertypeRule {
+      srSubtypeConstraint :: SubtypeConstraint
+    }
 
 -- SUBTYPE OF ' ( ' entity_ref { ' , ' entity_ref } ' ) ' .
 data SubtypeDeclaration = SubtypeDeclaration {
@@ -222,8 +257,8 @@ data SupertypeExpression where
 
 -- supertype_term { AND supertype_term } .
 data SupertypeFactor where
-  STTerm :: SupertypeTerm -> SupertypeFactor
-  And :: SupertypeTerm -> SupertypeTerm -> SupertypeFactor
+  STTerm :: SupertypeTerm a => a -> SupertypeFactor
+  And :: (SupertypeTerm a, SupertypeTerm b) => a -> b -> SupertypeFactor
 
 -- entity_ref | one_of | ' ( ' supertype_expression ' ) ' .
 class SupertypeTerm a
@@ -256,13 +291,11 @@ data UniqueClause = UniqueClause {
 }
 
 -- [ rule_label_id ' : ' ] referenced_attribute { ' , ' referenced_attribute } .
-data UniqueRule = UniqueRule {
-  ruleLabelId :: Maybe RuleLabelId
-, attrs       :: [ReferencedAttribute]
-}
+data UniqueRule where
+  UniqueRule :: ReferencedAttribute a => Maybe RuleLabelId -> a -> UniqueRule
 
 -- attribute_ref | qualified_attribute .
-class ReferencedAttribute
+class ReferencedAttribute a
 instance ReferencedAttribute AttributeRef
 instance ReferencedAttribute QualifiedAttribute
 
@@ -336,8 +369,8 @@ data Term where
 
 -- simple_factor [ ' ** ' simple_factor ] .
 data Factor where
-  FSimpleFactor :: SimpleFactor -> Factor
-  FSPow :: SimpleFactor -> SimpleFactor -> Factor
+  FSimpleFactor :: SimpleFactor a => a -> Factor
+  FSPow :: (SimpleFactor a, SimpleFactor b) => a -> b -> Factor
 
 -- aggregate_initializer | entity_constructor | enumeration_reference | interval | query_expression | ( [ unary_op ] ( ' ( ' expression ' ) ' | primary ) ) .
 class SimpleFactor a
@@ -354,20 +387,23 @@ data UnaryOppedSF = UnaryOppedSF {
 }
 
 -- literal | ( qualifiable_factor { qualifier } ) .
-class Primary a
-instance Primary Literal
-instance Primary QualifiableFactorWithQualifiers
+class CPrimary a
+instance CPrimary Literal
+instance CPrimary QualifiableFactorWithQualifiers
 
-data QualifiableFactorWithQualifiers = QualifiableFactorWithQualifiers {
-  qfwqFactor :: QualifiableFactor
-, qualifier  :: Maybe [Qualifier]
-}
+data Primary = forall a. CPrimary a => Primary a
+
+data QualifiableFactorWithQualifiers where
+  QualifiableFactorWithQualifiers :: QualifiableFactor a =>
+    a -> Maybe [Qualifier] -> QualifiableFactorWithQualifiers
 
 -- attribute_qualifier | group_qualifier | index_qualifier .
-class Qualifier a
-instance Qualifier AttributeQualifier
-instance Qualifier GroupQualifier
-instance Qualifier IndexQualifier
+class CQualifier a
+instance CQualifier AttributeQualifier
+instance CQualifier GroupQualifier
+instance CQualifier IndexQualifier
+
+data Qualifier = forall a. CQualifier a => Qualifier a
 
 -- ' [ ' index_1 [ ' : ' index_2 ] ' ] ' .
 data IndexQualifier = IndexQualifier {
@@ -386,16 +422,18 @@ type Index = NumericExpression
 
 -- attribute_ref | constant_factor | function_call | general_ref | population .
 class QualifiableFactor a
-instance QualifiableFactor AttributeRef
 instance QualifiableFactor ConstantFactor
 instance QualifiableFactor FunctionCall
-instance QualifiableFactor GeneralRef
-instance QualifiableFactor Population
+-- Squashing instances for AttributeRef, GeneralRef and Population into once
+-- since they're both SimpleIds
+instance QualifiableFactor SimpleId
 
 -- built_in_constant | constant_ref .
-class ConstantFactor a
-instance ConstantFactor BuiltInConstant
-instance ConstantFactor ConstantRef
+class CConstantFactor a
+instance CConstantFactor BuiltInConstant
+instance CConstantFactor ConstantRef
+
+data ConstantFactor = forall a. CConstantFactor a => ConstantFactor a
 
 -- ( built_in_function | function_ref ) [ actual_parameter_list ] .
 data FunctionCall = FunctionCall {
@@ -404,9 +442,9 @@ data FunctionCall = FunctionCall {
 }
 
 -- parameter_ref | variable_ref .
-class GeneralRef a
-instance GeneralRef ParameterRef
-instance GeneralRef VariableRef
+--
+-- It's all SimpleId in the end
+type GeneralRef = SimpleId
 
 -- entity_ref .
 type Population = EntityRef
@@ -467,11 +505,13 @@ data BuiltInFunction =
 data BuiltInConstant = CONST_E | PI | SELF | QuestionMark
 
 -- binary_literal | logical_literal | real_literal | string_literal .
-class Literal a
-instance Literal BinaryLiteral
-instance Literal LogicalLiteral
-instance Literal RealLiteral
-instance Literal StringLiteral
+class CLiteral a
+instance CLiteral BinaryLiteral
+instance CLiteral LogicalLiteral
+instance CLiteral RealLiteral
+instance CLiteral StringLiteral
+
+data Literal = forall a. CLiteral a => Literal a
 
 -- nteger_literal | ( digits ' . ' [ digits ] [ ' e ' [ sign ] digits ] ) .
 data RealLiteral = RealLiteral
@@ -564,9 +604,11 @@ data MultiplicationLikeOp = Times | Divide | DIV | MOD | AND | Or
 data AddLikeOp = Plus | Minus | OR | XOR
 
 -- attribute_id | redeclared_attribute .
-class AttributeDecl a
-instance AttributeDecl AttributeId
-instance AttributeDecl RedeclaredAttribute
+class CAttributeDecl a
+instance CAttributeDecl AttributeId
+instance CAttributeDecl RedeclaredAttribute
+
+data AttributeDecl = forall a. CAttributeDecl a => AttributeDecl a
 
 -- qualified_attribute [ RENAMED attribute_id ] .
 data RedeclaredAttribute = RedeclaredAttribute {
@@ -587,20 +629,22 @@ data DerivedAttr = DerivedAttr {
 }
 
 -- generalized_types | named_types | simple_types .
-class ParameterType a
-instance GeneralizedTypes a => ParameterType a
-instance NamedTypes a => ParameterType a
-instance SimpleTypes a => ParameterType a
+class CParameterType a
+instance CParameterType NamedTypes
+instance GeneralizedTypes a => CParameterType a
+instance CParameterType SimpleTypes
+
+data ParameterType = forall a. CParameterType a => ParameterType a
 
 -- entity_ref | type_ref .
-class NamedTypes a
-instance NamedTypes EntityRef
-instance NamedTypes TypeRef
+--
+-- In the end, it's SimpleId.
+type NamedTypes = SimpleId
 
 -- aggregate_type | general_aggregation_types | generic_entity_type | generic_type .
 class GeneralizedTypes a
 instance GeneralizedTypes AggregateType
-instance GeneralAggregationTypes a => GeneralizedTypes
+instance GeneralAggregationTypes a => GeneralizedTypes a
 instance GeneralizedTypes GenericEntityType
 instance GeneralizedTypes GenericType
 
@@ -610,9 +654,9 @@ data GenericType = GenericType {
 }
 
 -- type_label_id | type_label_ref .
-class TypeLabel a
-instance TypeLabel TypeLabelId
-instance TypeLabel TypeLabelRef
+--
+-- In the end, it all comes down to SimpleId.
+type TypeLabel = SimpleId
 
 -- type_label_id .
 type TypeLabelRef = TypeLabelId
@@ -672,28 +716,25 @@ data ExplicitAttr = ExplicitAttr {
 , eAParameterType :: ParameterType
 }
 
--- TYPE type_id ' = ' underlying_type ' ; ' [ where_clause ] END_TYPE ' ; ' .
-data TypeDecl = TypeDecl {
-  tDTypeId       :: TypeId
-, underlyingType :: UnderlyingType
-, whereClause    :: Maybe WhereClause
-}
-
 -- concrete_types | constructed_types .
-class UnderlyingType a
-instance ConcreteTypes a => UnderlyingType a
-instance ConstructedTypes a => UnderlyingType a
+class CUnderlyingType a
+instance ConcreteTypes a => CUnderlyingType a
+instance CUnderlyingType ConstructedTypes
+
+data UnderlyingType = forall a. CUnderlyingType a => UnderlyingType a
 
 -- enumeration_type | select_type .
-class ConstructedTypes a
-instance ConstructedTypes EnumerationType
-instance ConstructedTypes SelectType
-
--- [ EXTENSIBLE [ GENERIC_ENTITY ] ] SELECT [ select_list | select_extension ] .
-data SelectType = SelectType {
-  extensibleGenericEntity :: Maybe (Extensible (Maybe GenericEntity))
-, sTBody                  :: Maybe (Either SelectList SelectExtension)
-}
+data ConstructedTypes =
+  -- [ EXTENSIBLE [ GENERIC_ENTITY ] ] SELECT [ select_list | select_extension ] .
+    SelectType {
+      extensibleGenericEntity :: Maybe (Extensible (Maybe GenericEntity))
+    , sTBody                  :: Maybe (Either SelectList SelectExtension)
+    }
+  -- [ EXTENSIBLE ] ENUMERATION [ ( OF enumeration_items ) | enumeration_extension ] .
+  | EnumerationType {
+      extensible :: Bool
+    , body       :: Maybe (Either EnumerationItems EnumerationExtension)
+    }
 
 data Extensible a = Extensible a
 
@@ -710,11 +751,6 @@ data SelectList = SelectList {
   sLNamedTypes :: [NamedTypes]
 }
 
--- [ EXTENSIBLE ] ENUMERATION [ ( OF enumeration_items ) | enumeration_extension ] .
-data EnumerationType = EnumerationType {
-  extensible :: Bool
-, body       :: Maybe (Either EnumerationItems EnumerationExtension)
-}
 
 -- BASED_ON type_ref [ WITH enumeration_items ] .
 data EnumerationExtension = EnumerationExtension {
@@ -725,12 +761,6 @@ data EnumerationExtension = EnumerationExtension {
 -- ' ( ' enumeration_id { ' , ' enumeration_id } ' ) ' .
 data EnumerationItems = EnumerationItems {
   eIEnumerationItems :: [EnumerationId]
-}
-
--- subtype_constraint_head subtype_constraint_body END_SUBTYPE_CONSTRAINT ' ; ' .
-data SubtypeConstraintDecl = SubtypeConstraintDecl {
-  subtypeConstraintHead :: SubtypeConstraintHead
-, subtypeConstraintBody :: SubtypeConstraintBody
 }
 
 -- SUBTYPE_CONSTRAINT subtype_constraint_id FOR entity_ref ' ; ' .
@@ -756,13 +786,6 @@ data AbstractSupertype = AbstractSupertype
 
 -- simple_id .
 type SubtypeConstraintId = SimpleId
-
--- procedure_head algorithm_head { stmt } END_PROCEDURE ' ; ' .
-data ProcedureDecl = ProcedureDecl {
-  procedureHead :: ProcedureHead
-, algorithmHead :: AlgorithmHead
-, stmts         :: Maybe [Stmt]
-}
 
 -- alias_stmt | assignment_stmt | case_stmt | compound_stmt | escape_stmt | if_stmt | null_stmt | procedure_call_stmt | repeat_stmt | return_stmt | skip_stmt .
 data Stmt =
@@ -911,13 +934,6 @@ data FormalParameter = FormalParameter {
 , fPParameterType :: ParameterType
 }
 
--- function_head algorithm_head stmt { stmt } END_FUNCTION ' ; ' .
-data FunctionDecl = FunctionDecl {
-  fDFunctionHead  :: FunctionHead
-, fDAlgorithmHead :: AlgorithmHead
-, fDStatements    :: [Stmt]
-}
-
 -- FUNCTION function_id [ ' ( ' formal_parameter { ' ; ' formal_parameter } ' ) ' ] ' : ' parameter_type ' ; ' .
 data FunctionHead = FunctionHead {
   fHFunctionId       :: FunctionId
@@ -926,54 +942,27 @@ data FunctionHead = FunctionHead {
 }
 
 -- rel_op | IN | LIKE .
-class RelOpExtended a
-instance RelOpExtended RelOp
-instance RelOpExtended OpIN
-instance RelOpExtended OpLIKE
-
-data OpIN = OpIN
-
-data OpLIKE = OpLIKE
-
--- ' < ' | ' > ' | ' <= ' | ' >= ' | ' <> ' | ' = ' | ' :<>: ' | ' :=: ' .
-data RelOp = ROL | ROG | ROLE | ROGE | RONE | ROE | ROWNE | ROWE
--- WE is "weird equals", WNE is "weird not equals"
-
--- STRING [ width_spec ] .
-data StringType = StringType {
-  widthSpec :: Maybe WidthSpec
-}
+data RelOpExtended =
+    OpIN
+  | OpLIKE
+  -- ' < ' | ' > ' | ' <= ' | ' >= ' | ' <> ' | ' = ' | ' :<>: ' | ' :=: ' .
+  | ROL
+  | ROG
+  | ROLE
+  | ROGE
+  | RONE
+  | ROE
+  -- WE is "weird equals", WNE is "weird not equals"
+  | ROWNE
+  | ROWE
 
 -- ' ( ' width ' ) ' [ FIXED ] .
 data WidthSpec = WidthSpec {
   width :: Width
 , fixed :: Bool
 }
-
--- REAL [ ' ( ' precision_spec ' ) ' ] .
-data RealType = RealType {
-  precisionSpec :: Maybe PrecisionSpec
-}
-
 -- numeric_expression .
 type PrecisionSpec = NumericExpression
-
--- NUMBER .
-data NumberType = NumberType
-
--- LOGICAL .
-data LogicalType = LogicalType
-
--- INTEGER .
-data IntegerType = IntegerType
-
--- BOOLEAN .
-data BooleanType = BooleanType
-
--- BINARY [ width_spec ] .
-data BinaryType = BinaryType {
-  bTWidthSpec :: Maybe WidthSpec
-}
 
 -- SET [ bound_spec ] OF instantiable_type .
 data SetType = SetType {
@@ -1000,12 +989,6 @@ data ArrayType = ArrayType {
 , aTOptional :: Bool
 , aTUnique   :: Bool
 , aTType     :: InstantiableType
-}
-
--- USE FROM schema_ref [ ' ( ' named_type_or_rename { ' , ' named_type_or_rename } ' ) ' ] ' ; ' .
-data UseClause = UseClause {
-  uCSchemaRef         :: SchemaRef
-, namedTypesOrRenames :: Maybe [NamedTypeOrRename]
 }
 
 -- named_types [ AS ( entity_id | type_id ) ] .
