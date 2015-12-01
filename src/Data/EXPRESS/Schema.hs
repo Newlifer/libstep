@@ -3,7 +3,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Schema where
+module Data.EXPRESS.Schema where
 
 {- Lists are implied to be one or more elements long. If list can be empty, we
  - use Maybe [...] instead.
