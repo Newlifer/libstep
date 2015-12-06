@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Data.EXPRESS.Parsers (
 ) where
 
@@ -5,6 +7,7 @@ import Prelude hiding (takeWhile)
 
 import Control.Applicative (optional)
 import Data.Attoparsec.ByteString
+import Data.Either
 import Data.Word
 
 import qualified Data.ByteString as BS
@@ -12,6 +15,16 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 
 import Data.EXPRESS.Schema
+
+{- All lists in this AST are non-empty. When we need a list that can possibly
+ - be empty, we wrap it into Maybe and signal its emptinness with Nothing.
+ -
+ - But parsers return simple lists, no matter if they are empty or not. This
+ - function wraps the list into Maybe according to the rules mentioned above.
+ - -}
+listToMaybe :: [a] -> Maybe [a]
+listToMaybe [] = Nothing
+listToMaybe xs = Just xs
 
 -- schema_decl { schema_decl } .
 pExpress :: Parser Express
@@ -37,7 +50,14 @@ pSchemaVersionId = pStringLiteral
 
 -- { interface_specification } [ constant_decl ] { declaration | rule_decl } .
 pSchemaBody :: Parser SchemaBody
-pSchemaBody = undefined
+pSchemaBody = do
+  interfaces' <- many' pInterfaceSpecification
+  let interfaces = listToMaybe interfaces'
+  constants <- optional pConstantDecl
+  other <- many' (eitherP pDeclaration pRuleDecl)
+  let declarations = listToMaybe $ lefts other
+  let rules = listToMaybe $ rights other
+  return $ SchemaBody interfaces constants declarations rules
 
 -- letter { letter | digit | ' _ ' } .
 pSimpleId :: Parser SimpleId
@@ -150,7 +170,23 @@ pStringLiteral = choice [pSimpleStringLiteral, pEncodedStringLiteral]
 
 -- reference_clause | use_clause .
 pInterfaceSpecification :: Parser InterfaceSpecification
-pInterfaceSpecification = undefined
+pInterfaceSpecification = choice [pReferenceClause, pUseClause]
+
+-- REFERENCE FROM schema_ref [ ' ( ' resource_or_rename { ' , ' resource_or_rename } ' ) ' ] ' ; ' .
+pReferenceClause :: Parser InterfaceSpecification
+pReferenceClause = do
+  string "REFERENCE FROM"
+  schemaRef <- pSchemaRef
+  resources <- optional $ do
+    string "("
+    first <- pResourceOrRename
+    rest <- many' $ string "," >> pResourceOrRename
+    string ")"
+    return $ first : rest
+  return $ ReferenceClause schemaRef resources
+
+pUseClause :: Parser InterfaceSpecification
+pUseClause = undefined
 
 -- schema_id .
 pSchemaRef :: Parser SchemaRef
