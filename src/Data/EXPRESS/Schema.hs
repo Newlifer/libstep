@@ -679,7 +679,7 @@ instance GeneralAggregationTypes GeneralSetType
 -- ARRAY [ bound_spec ] OF [ OPTIONAL ] [ UNIQUE ] parameter_type .
 data GeneralArrayType = GeneralArrayType {
   gATBounds        :: Maybe BoundSpec
-, optional         :: Bool
+, gOptional        :: Bool
 , gATUnique        :: Bool
 , gATParameterType :: ParameterType
 }
@@ -961,6 +961,7 @@ data WidthSpec = WidthSpec {
   width :: Width
 , fixed :: Bool
 }
+
 -- numeric_expression .
 type PrecisionSpec = NumericExpression
 
