@@ -1,13 +1,31 @@
 module Data.EXPRESS.Parsers (
 ) where
 
+import Prelude hiding (takeWhile)
+
+import Control.Applicative (optional)
+import Data.Attoparsec.ByteString
+import Data.Word
+
+import qualified Data.ByteString as BS
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
+
+import Data.EXPRESS.Schema
+
 -- schema_decl { schema_decl } .
 pExpress :: Parser Express
-pExpress = undefined
+pExpress = do
+  schemas <- many1 pSchema
+  return $ Express schemas
 
 -- SCHEMA schema_id [ schema_version_id ] ' ; ' schema_body END_SCHEMA ' ; ' .
 pSchema :: Parser Schema
-pSchema = undefined
+pSchema = do
+  id <- pSchemaId
+  versionId <- optional pSchemaVersionId
+  body <- pSchemaBody
+  return $ Schema id versionId body
 
 -- simple_id .
 pSchemaId :: Parser SchemaId
@@ -23,7 +41,23 @@ pSchemaBody = undefined
 
 -- letter { letter | digit | ' _ ' } .
 pSimpleId :: Parser SimpleId
-pSimpleId = undefined
+pSimpleId = do
+  start <- takeWhile isLetter
+  if BS.null start
+    then return $ T.empty
+    else do
+      rest <- takeWhile (\x -> isLetter x || isDigit x || isUnderscore x)
+      return $ TE.decodeUtf32BE (start `BS.append` rest)
+
+  where
+  isUnderscore :: Word8 -> Bool
+  isUnderscore ch = ch == 0x5F
+
+isLetter, isDigit :: Word8 -> Bool
+isLetter ch = (ch >= 0x41 && ch <= 0x5A) -- capital letters
+           || (ch >= 0x61 && ch <= 0x7A) -- small letters
+
+isDigit ch = ch >= 0x30 && ch <= 0x39
 
 {- \q { ( \q \q ) | not_quote | \s | \x9 | \xA | \xD } \q .
 
@@ -31,7 +65,88 @@ pSimpleId = undefined
 
    ' " ' encoded_character { encoded_character } ' " ' . -}
 pStringLiteral :: Parser StringLiteral
-pStringLiteral = undefined
+pStringLiteral = choice [pSimpleStringLiteral, pEncodedStringLiteral]
+  where
+  -- \q { ( \q \q ) | not_quote | \s | \x9 | \xA | \xD } \q .
+  pSimpleStringLiteral :: Parser T.Text
+  pSimpleStringLiteral = do
+    word8 apostrophe
+    literal <- many' $ choice [pQQ, pNotQuote, pOther]
+    word8 apostrophe
+    return $ TE.decodeUtf32BE $ BS.concat literal
+
+    where
+    apostrophe :: Word8
+    apostrophe = 0x27
+
+    pQQ :: Parser BS.ByteString
+    pQQ = do
+      word8 apostrophe
+      word8 apostrophe
+      return $ BS.pack [apostrophe, apostrophe]
+
+    pNotQuote :: Parser BS.ByteString
+    pNotQuote = takeWhile okay
+      where
+      okay x = (isLetter x)
+            || (isDigit x)
+            -- ! " # $ % & ' ( ) * + , - . /
+            || (x >= 0x21 && x <= 0x2F)
+            -- : ; < = > ?
+            || (x >= 0x3A && x <= 0x3F)
+            -- @
+            ||  x == 0x40
+            -- [ \ ] ^
+            || (x >= 0x5B && x <= 0x5E)
+            -- `
+            ||  x == 0x60
+            -- { | } ~
+            || (x >= 0x7B && x <= 0x7E)
+
+    -- \s | \x9 | \xA | \xD
+    pOther :: Parser BS.ByteString
+    pOther = do
+      ch <- satisfy okay
+      return $ BS.singleton ch
+      where
+      okay x = x == 0x20 -- space
+            || x == 0x09 -- tab
+            || x == 0x0A -- LF
+            || x == 0x0D -- CR
+
+  -- ' " ' encoded_character { encoded_character } ' " ' .
+  pEncodedStringLiteral :: Parser T.Text
+  pEncodedStringLiteral = do
+    word8 quote
+    str <- many1 pEncodedCharacter
+    word8 quote
+    return $ T.concat str
+    where
+    quote :: Word8
+    quote = 0x34
+
+    {-
+    encoded_character = octet octet octet octet .
+    octet = hex_digit hex_digit .
+    hex_digit = digit | ' a ' | ' b ' | ' c ' | ' d ' | ' e ' | ' f ' .
+    -}
+    pEncodedCharacter :: Parser T.Text
+    pEncodedCharacter = do
+      octets <- count 4 pOctet
+      return $ TE.decodeUtf32BE $ BS.pack octets
+
+    pOctet :: Parser Word8
+    pOctet = do
+      high <- pHexDigit
+      low  <- pHexDigit
+      return $ (wordToNum high) * 16 + (wordToNum low)
+      where
+      wordToNum x = if (x >= 0x30 && x <= 0x39)
+                      then x - 0x30 -- digit
+                      else x - 0x61 -- letter
+
+    pHexDigit :: Parser Word8
+    pHexDigit = satisfy (\x -> (isDigit x) || (x >= 0x61 && x <= 0x66))
 
 -- reference_clause | use_clause .
 pInterfaceSpecification :: Parser InterfaceSpecification
