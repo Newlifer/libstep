@@ -185,8 +185,18 @@ pReferenceClause = do
     return $ first : rest
   return $ ReferenceClause schemaRef resources
 
+-- USE FROM schema_ref [ ' ( ' named_type_or_rename { ' , ' named_type_or_rename } ' ) ' ] ' ; ' .
 pUseClause :: Parser InterfaceSpecification
-pUseClause = undefined
+pUseClause = do
+  string "USE FROM"
+  schemaRef <- pSchemaRef
+  namedTypesOrRenames <- optional $ do
+    string "("
+    first <- pNamedTypeOrRename
+    rest <- many' $ string "," >> pNamedTypeOrRename
+    string ")"
+    return $ first : rest
+  return $ UseClause schemaRef namedTypesOrRenames
 
 -- schema_id .
 pSchemaRef :: Parser SchemaRef
@@ -194,7 +204,10 @@ pSchemaRef = pSchemaId
 
 -- resource_ref [ AS rename_id ] .
 pResourceOrRename :: Parser ResourceOrRename
-pResourceOrRename = undefined
+pResourceOrRename = do
+  resourceRef <- pResourceRef
+  renameId <- optional pRenameId
+  return $ ResourceOrRename resourceRef renameId
 
 -- constant_ref | entity_ref | function_ref | procedure_ref | type_ref .
 --
@@ -252,7 +265,11 @@ pTypeId = pSimpleId
 
 -- CONSTANT constant_body { constant_body } END_CONSTANT ' ; ' .
 pConstantDecl :: Parser ConstantDecl
-pConstantDecl = undefined
+pConstantDecl = do
+  string "CONSTANT"
+  body <- many1 pConstantBody
+  string "END_CONSTANT;"
+  return $ ConstantDecl (listToMaybe body)
 
 -- constant_id ' : ' instantiable_type ' := ' expression ' ; ' .
 pConstantBody :: Parser ConstantBody

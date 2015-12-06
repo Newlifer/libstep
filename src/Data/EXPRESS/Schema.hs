@@ -58,7 +58,6 @@ data InterfaceSpecification =
     , namedTypesOrRenames :: Maybe [NamedTypeOrRename]
     }
 
-
 -- schema_id .
 type SchemaRef = SchemaId
 
