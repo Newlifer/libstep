@@ -1,0 +1,104 @@
+strict digraph "express_types" {
+// dashed lines mean that teh node on the left uses node on the right in its
+// definition
+"aggregate type" -> "parameter type" [style=dashed]
+
+// box shape means the type on the left is simply a collection of types
+"aggregation types" [shape=box]
+"aggregation types" -> "array type"
+"aggregation types" -> "bag type"
+"aggregation types" -> "list type"
+"aggregation types" -> "set type"
+
+"array type" -> "instantiable type" [style=dashed]
+
+"bag type" -> "instantiable type" [style=dashed]
+
+"binary type"
+
+"boolean type"
+
+"concrete types" [shape=box]
+"concrete types" -> "aggregation types"
+"concrete types" -> "simple types"
+"concrete types" -> "type ref"
+
+"constructed types" [shape=box]
+"constructed types" -> "enumeration type"
+"constructed types" -> "select type"
+
+"enumeration type" -> "type ref" [style=dashed]
+
+"generalized types" [shape=box]
+"generalized types" -> "aggregate type"
+"generalized types" -> "general aggregation types"
+"generalized types" -> "generic entity type"
+"generalized types" -> "generic type"
+
+"general aggregation types" [shape=box]
+"general aggregation types" -> "general array type"
+"general aggregation types" -> "general bag type"
+"general aggregation types" -> "general list type"
+"general aggregation types" -> "general set type"
+
+"general array type" -> "parameter type" [style=dashed]
+
+"general bag type" -> "parameter type" [style=dashed]
+
+"general list type" -> "parameter type" [style=dashed]
+
+"general set type" -> "parameter type" [style=dashed]
+
+"generic entity type"
+
+"generic type"
+
+"instantiable type" [shape=box]
+"instantiable type" -> "concrete types"
+"instantiable type" -> "type ref"
+
+"integer type"
+
+"list type" -> "instantiable type" [style=dashed]
+
+"logical type"
+
+"named types" [shape=box]
+"named types" -> "entity ref"
+"named types" -> "type ref"
+
+"named type or rename" -> "named types" [style=dashed]
+
+"number type"
+
+"parameter type" [shape=box]
+"parameter type" -> "generalized types"
+"parameter type" -> "named types"
+"parameter type" -> "simple types"
+
+"real type"
+
+"select type" -> "type ref" [style=dashed]
+"select type" -> "named types" [style=dashed]
+
+"set type" -> "instantiable type" [style=dashed]
+
+"simple types" [shape=box]
+"simple types" -> "binary type"
+"simple types" -> "boolean type"
+"simple types" -> "integer type"
+"simple types" -> "logical type"
+"simple types" -> "number type"
+"simple types" -> "real type"
+"simple types" -> "string type"
+
+"string type"
+
+"type decl" [shape=octagon]
+"type decl" -> "underlying type" [style=dashed]
+
+"underlying type" [shape=box]
+"underlying type" -> "concrete types"
+"underlying type" -> "constructed types"
+
+}
