@@ -60,15 +60,15 @@ pSchema = do
   skipWhitespace1
   id <- pSchemaId
   skipWhitespace
-  -- versionId <- optional pSchemaVersionId
+  versionId <- optional pSchemaVersionId
+  skipWhitespace
   string ";" <?> "semicolon after schema id"
   skipWhitespace
-  -- body <- pSchemaBody
+  body <- pSchemaBody
   string "END_SCHEMA" <?> "END_SCHEMA keyword"
   skipWhitespace
   string ";"
-  -- return $ Schema id versionId body
-  return $ Schema id Nothing SchemaBody
+  return $ Schema id versionId body
 
 -- simple_id .
 pSchemaId :: Parser SchemaId
@@ -124,7 +124,7 @@ pStringLiteral = choice [pSimpleStringLiteral, pEncodedStringLiteral]
     word8 apostrophe
     literal <- many' $ choice [pQQ, pNotQuote, pWhitespace]
     word8 apostrophe
-    return $ TE.decodeUtf32BE $ BS.concat literal
+    return $ TE.decodeUtf8 $ BS.concat literal
 
     where
     apostrophe :: Word8
@@ -137,20 +137,18 @@ pStringLiteral = choice [pSimpleStringLiteral, pEncodedStringLiteral]
       return $ BS.pack [apostrophe, apostrophe]
 
     pNotQuote :: Parser BS.ByteString
-    pNotQuote = takeWhile okay
+    pNotQuote = takeWhile1 okay
       where
       okay x = (isLetter x)
             || (isDigit x)
-            -- ! " # $ % & ' ( ) * + , - . /
-            || (x >= 0x21 && x <= 0x2F)
-            -- : ; < = > ?
-            || (x >= 0x3A && x <= 0x3F)
-            -- @
-            ||  x == 0x40
-            -- [ \ ] ^
-            || (x >= 0x5B && x <= 0x5E)
-            -- `
-            ||  x == 0x60
+            -- ! " # $ % &
+            || (x >= 0x21 && x <= 0x26)
+            -- ( ) * + , - . /
+            || (x >= 0x28 && x <= 0x2F)
+            -- : ; < = > ? @
+            || (x >= 0x3A && x <= 0x40)
+            -- [ \ ] ^ _ `
+            || (x >= 0x5B && x <= 0x60)
             -- { | } ~
             || (x >= 0x7B && x <= 0x7E)
 

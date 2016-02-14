@@ -37,3 +37,12 @@ createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
             (T.pack "design")
             Nothing
             SchemaBody])
+
+    it "should parse schema with version id" $
+      shouldParse
+        ((C8.pack "SCHEMA design '{ISO standard 10303 part(41) object(1)\n\tversion(9)}' ;\nEND_SCHEMA;") ~> pExpress)
+        (Express [
+          Schema
+            (T.pack "design")
+            (Just $ T.pack "{ISO standard 10303 part(41) object(1)\n\tversion(9)}")
+            SchemaBody])
