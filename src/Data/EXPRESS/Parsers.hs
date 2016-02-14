@@ -7,6 +7,7 @@ module Data.EXPRESS.Parsers (
 import Prelude hiding (takeWhile)
 
 import Control.Applicative (optional)
+import Control.Monad (void)
 import Data.Attoparsec.ByteString
 import Data.Either
 import Data.Word
@@ -27,6 +28,56 @@ import Data.EXPRESS.Schema
 listToMaybe :: [a] -> Maybe [a]
 listToMaybe [] = Nothing
 listToMaybe xs = Just xs
+
+{- ^ `enclosed left right sep p` pads a call to `sepBy1 p sep` with `left >>
+ - sep` and `sep >> right`.
+ -
+ - Useful to parse brace-enclosed things, like that:
+ -
+ -    enclosed
+ -      (string "(")
+ -      (string ")")
+ -      (many1 $ word8 0x20)
+ -      (word8 0x41)
+ -
+ - (this will parse things like "(  A      A  A A         A)" and return ['A',
+ - 'A', 'A', 'A', 'A'])
+ -}
+enclosed :: Parser a
+         -> Parser b
+         -> Parser c
+         -> Parser d
+         -> Parser [d]
+enclosed left right sep p = do
+  left
+  result <- p `sepBy1` sep
+  right
+  return result
+
+-- ^ Parses a list enclosed into parenthesis
+parens :: Parser a
+       -> Parser b
+       -> Parser [b]
+parens sep p =
+  enclosed
+    (string "(" >> skipWhitespace)
+    (string ")" >> skipWhitespace)
+    sep
+    p
+
+-- ^ A comma with optional whitespace on either side
+commaSep :: Parser ()
+commaSep = void $ do
+  skipWhitespace
+  string ","
+  skipWhitespace
+
+-- ^ "AS" keywords with non-optional whitespace on either side
+asSep :: Parser ()
+asSep = void $ do
+  skipWhitespace1
+  string "AS"
+  skipWhitespace1
 
 
 
@@ -208,17 +259,7 @@ pInterfaceSpecification = choice [pReference, pUse]
     ref <- pSchemaRef
     resources <- optional $ do
       skipWhitespace
-      string "("
-      skipWhitespace
-      res1 <- pResourceOrRename
-      rest <- many' $ do
-        skipWhitespace
-        string ","
-        skipWhitespace
-        pResourceOrRename
-      skipWhitespace
-      string ")"
-      return $ res1 : rest
+      parens commaSep pResourceOrRename
     skipWhitespace
     string ";"
     skipWhitespace
@@ -234,17 +275,7 @@ pInterfaceSpecification = choice [pReference, pUse]
     ref <- pSchemaRef
     renames <- optional $ do
       skipWhitespace
-      string "("
-      skipWhitespace
-      rename1 <- pNamedTypeOrRename
-      rest <- many' $ do
-        skipWhitespace
-        string ","
-        skipWhitespace
-        pNamedTypeOrRename
-      skipWhitespace
-      string ")"
-      return $ rename1 : rest
+      parens commaSep pNamedTypeOrRename
     skipWhitespace
     string ";"
     skipWhitespace
@@ -259,9 +290,7 @@ pResourceOrRename :: Parser ResourceOrRename
 pResourceOrRename = do
   ref <- pResourceRef
   as_id <- optional $ do
-    skipWhitespace1
-    string "AS"
-    skipWhitespace1
+    asSep
     pRenameId
   return $ ResourceOrRename ref as_id
 
@@ -285,9 +314,7 @@ pNamedTypeOrRename = do
   skipWhitespace
   ref <- pNamedTypes
   as_id <- optional $ do
-    skipWhitespace1
-    string "AS"
-    skipWhitespace1
+    asSep
     eitherP pEntityId pTypeId
   skipWhitespace
   return $ NamedTypeOrRename ref as_id
