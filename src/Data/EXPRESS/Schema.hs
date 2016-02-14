@@ -119,7 +119,7 @@ type StringLiteral = Text
 -- data ConstantDecl = ConstantDecl {
 --   cbody :: Maybe [ConstantBody]
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- constant_id ' : ' instantiable_type ' := ' expression ' ; ' .
 -- data ConstantBody = ConstantBody {
@@ -127,7 +127,7 @@ type StringLiteral = Text
 -- , type_        :: InstantiableType
 -- , cBExpression :: Expression
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- concrete_types | entity_ref .
 -- class CInstantiableType a
@@ -173,13 +173,13 @@ type StringLiteral = Text
 --   | StringType {
 --       widthSpec :: Maybe WidthSpec
 --     }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- simple_expression [ rel_op_extended simple_expression ] .
 -- data Expression where
 --   ESimple :: SimpleExpression -> Expression
 --   EOp :: SimpleExpression -> RelOpExtended -> SimpleExpression -> Expression
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- entity_decl | function_decl | procedure_decl | subtype_constraint_decl | type_decl .
 -- data Declaration =
@@ -214,14 +214,14 @@ type StringLiteral = Text
 --     , underlyingType :: UnderlyingType
 --     , whereClause    :: Maybe WhereClause
 --     }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- ENTITY entity_id subsuper ' ; ' .
 -- data EntityHead = EntityHead {
 --   eid      :: EntityId
 -- , subsuper :: SubSuper
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- { explicit_attr } [ derive_clause ] [ inverse_clause ] [ unique_clause ] [ where_clause ] .
 -- data EntityBody = EntityBody {
@@ -231,14 +231,14 @@ type StringLiteral = Text
 -- , uniqueClause  :: Maybe UniqueClause
 -- , eBWhereClause :: Maybe WhereClause
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- [ supertype_constraint ] [ subtype_declaration ] .
 -- data SubSuper = SubSuper {
 --   sup :: Maybe SupertypeConstraint
 -- , sub :: Maybe SubtypeDeclaration
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- abstract_entity_declaration | abstract_supertype_declaration | supertype_rule .
 -- data SupertypeConstraint =
@@ -254,31 +254,31 @@ type StringLiteral = Text
 --   | SupertypeRule {
 --       srSubtypeConstraint :: SubtypeConstraint
 --     }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- SUBTYPE OF ' ( ' entity_ref { ' , ' entity_ref } ' ) ' .
 -- data SubtypeDeclaration = SubtypeDeclaration {
 --   subtypeOf :: [EntityRef]
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- OF ' ( ' supertype_expression ' ) ' .
 -- data SubtypeConstraint = SubtypeConstraint {
 --   scSupertypeExpression :: SupertypeExpression
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- supertype_factor { ANDOR supertype_factor } .
 -- data SupertypeExpression where
 --   SEFactor :: SupertypeFactor -> SupertypeExpression
 --   SEAndOr :: SupertypeFactor -> SupertypeFactor -> SupertypeExpression
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- supertype_term { AND supertype_term } .
 -- data SupertypeFactor where
 --   STTerm :: SupertypeTerm a => a -> SupertypeFactor
 --   And :: (SupertypeTerm a, SupertypeTerm b) => a -> b -> SupertypeFactor
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- entity_ref | one_of | ' ( ' supertype_expression ' ) ' .
 -- class SupertypeTerm a
@@ -290,20 +290,20 @@ type StringLiteral = Text
 -- data OneOf = OneOf {
 --   oOExpressions :: [SupertypeExpression]
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- WHERE domain_rule ' ; ' { domain_rule ' ; ' } .
 -- data WhereClause = WhereClause {
 --   domainRules :: [DomainRule]
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- [ rule_label_id ' : ' ] expression .
 -- data DomainRule = DomainRule {
 --   dRRuleLabelId :: Maybe RuleLabelId
 -- , expr          :: Expression
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- simple_id .
 -- type RuleLabelId = SimpleId
@@ -312,12 +312,12 @@ type StringLiteral = Text
 -- data UniqueClause = UniqueClause {
 --   uniqueRule :: [UniqueRule]
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- [ rule_label_id ' : ' ] referenced_attribute { ' , ' referenced_attribute } .
 -- data UniqueRule where
 --   UniqueRule :: ReferencedAttribute a => Maybe RuleLabelId -> a -> UniqueRule
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- attribute_ref | qualified_attribute .
 -- class ReferencedAttribute a
@@ -329,13 +329,13 @@ type StringLiteral = Text
 --   groupQualifier     :: GroupQualifier
 -- , attributeQualifier :: AttributeQualifier
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- ' . ' attribute_ref .
 -- data AttributeQualifier = AttributeQualifier {
 --   aQAttributeRef :: AttributeRef
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- attribute_id .
 -- type AttributeRef = AttributeId
@@ -347,13 +347,13 @@ type StringLiteral = Text
 -- data GroupQualifier = GroupQualifier {
 --   gQEntityRef :: EntityRef
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- INVERSE inverse_attr { inverse_attr } .
 -- data InverseClause = InverseClause {
 --   inverseAttrs :: [InverseAttr]
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- attribute_decl ' : ' [ ( SET | BAG ) [ bound_spec ] OF ] entity_ref FOR [ entity_ref ' . ' ] attribute_ref ' ; ' .
 -- data InverseAttr = InverseAttr {
@@ -363,23 +363,23 @@ type StringLiteral = Text
 -- , forEntityRef    :: Maybe EntityRef
 -- , attributeRef    :: AttributeRef
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- data SetOrBagBounds = SetOrBagBounds {
 --   setOrBag   :: SetOrBag
 -- , sOBBBounds :: Maybe BoundSpec
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- data SetOrBag = SetTag | BagTag
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- ' [ ' bound_1 ' : ' bound_2 ' ] ' .
 -- data BoundSpec = BoundSpec {
 --   bSBound1 :: Bound1
 -- , bSBound2 :: Bound2
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- numeric_expression .
 -- type Bound1 = NumericExpression
@@ -394,19 +394,19 @@ type StringLiteral = Text
 -- data SimpleExpression where
 --   SETerm :: Term -> SimpleExpression
 --   SEAddLikeOp :: Term -> AddLikeOp -> Term -> SimpleExpression
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- factor { multiplication_like_op factor } .
 -- data Term where
 --   TFactor :: Factor -> Term
 --   TMultiplicationLikeOp :: Factor -> MultiplicationLikeOp -> Factor -> Term
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- simple_factor [ ' ** ' simple_factor ] .
 -- data Factor =
 --     FSimpleFactor :: SimpleFactor a => a -> Factor
 --   | FSPow :: (SimpleFactor a, SimpleFactor b) => a -> b -> Factor
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- aggregate_initializer | entity_constructor | enumeration_reference | interval | query_expression | ( [ unary_op ] ( ' ( ' expression ' ) ' | primary ) ) .
 -- class SimpleFactor a
@@ -421,7 +421,7 @@ type StringLiteral = Text
 --   unaryOp  :: Maybe UnaryOp
 -- , uOSFBody :: Either Expression Primary
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- literal | ( qualifiable_factor { qualifier } ) .
 -- class CPrimary a
@@ -459,7 +459,7 @@ type StringLiteral = Text
 --   index1 :: Index1
 -- , index2 :: Maybe Index2
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- index .
 -- type Index1 = Index
@@ -492,7 +492,7 @@ type StringLiteral = Text
 --   begin :: Either BuiltInFunction FunctionRef
 -- , params :: Maybe ActualParameterList
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- parameter_ref | variable_ref .
 --
@@ -518,7 +518,7 @@ type StringLiteral = Text
 -- data ActualParameterList = ActualParameterList {
 --   parameters :: [Parameter]
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- expression .
 -- type Parameter = Expression
@@ -554,11 +554,11 @@ type StringLiteral = Text
 --   | VALUE
 --   | VALUE_IN
 --   | VALUE_UNIQUE
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- CONST_E | PI | SELF | ' ? ' .
 -- data BuiltInConstant = CONST_E | PI | SELF | QuestionMark
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- binary_literal | logical_literal | real_literal | string_literal .
 -- class CLiteral a
@@ -571,25 +571,25 @@ type StringLiteral = Text
 
 -- nteger_literal | ( digits ' . ' [ digits ] [ ' e ' [ sign ] digits ] ) .
 -- data RealLiteral = RealLiteral
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- FALSE | TRUE | UNKNOWN .
 -- data LogicalLiteral = FALSE | TRUE | UNKNOWN
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- ' % ' bit { bit } .
 -- data BinaryLiteral = BinaryLiteral {
 --   bits :: [Bit]
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- ' 0 ' | ' 1 ' .
 -- data Bit = Zero | One
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- ' + ' | ' - ' | NOT .
 -- data UnaryOp = UPlus | UMinus | UNOT
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- QUERY ' ( ' variable_id ' <* ' aggregate_source ' | ' logical_expression ' ) ' .
 -- data QueryExpression = QueryExpression {
@@ -597,7 +597,7 @@ type StringLiteral = Text
 -- , aggregateSource     :: AggregateSource
 -- , qELogicalExpression :: LogicalExpression
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- expression .
 -- type LogicalExpression = Expression
@@ -613,7 +613,7 @@ type StringLiteral = Text
 -- , intervalOp2  :: IntervalOp
 -- , intervalHigh :: IntervalHigh
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- simple_expression .
 -- type IntervalLow = SimpleExpression
@@ -626,14 +626,14 @@ type StringLiteral = Text
 
 -- ' < ' | ' <= ' .
 -- data IntervalOp = Less | LessEqual
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- [ type_ref ' . ' ] enumeration_ref .
 -- data EnumerationReference = EnumerationReference {
 --   typeRef        :: Maybe TypeRef
 -- , enumerationRef :: EnumerationRef
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- enumeration_id .
 -- type EnumerationRef = EnumerationId
@@ -646,20 +646,20 @@ type StringLiteral = Text
 --   entityRef   :: EntityRef
 -- , expressions :: Maybe [Expression]
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- ' [ ' [ element { ' , ' element } ] ' ] ' .
 -- data AggregateInitializer = AggregateInitializer {
 --   elements :: Maybe [Element]
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- expression [ ' : ' repetition ] .
 -- data Element = Element {
 --   eExpression :: Expression
 -- , repetition  :: Maybe Repetition
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- numeric_expression .
 -- type Repetition = NumericExpression
@@ -667,11 +667,11 @@ type StringLiteral = Text
 -- ' * ' | ' / ' | DIV | MOD | AND | ' || ' .
 -- `Or` is `||`
 -- data MultiplicationLikeOp = Times | Divide | DIV | MOD | AND | Or
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- ' + ' | ' - ' | OR | XOR .
 -- data AddLikeOp = Plus | Minus | OR | XOR
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- attribute_id | redeclared_attribute .
 -- class CAttributeDecl a
@@ -687,13 +687,13 @@ type StringLiteral = Text
 --   qualifiedAttribute :: QualifiedAttribute
 -- , attributeId        :: Maybe AttributeId
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- DERIVE derived_attr { derived_attr } .
 -- data DeriveClause = DeriveClause {
 --   derivedAttrs :: [DerivedAttr]
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- attribute_decl ' : ' parameter_type ' := ' expression ' ; ' .
 -- data DerivedAttr = DerivedAttr {
@@ -701,7 +701,7 @@ type StringLiteral = Text
 -- , dAParameterType :: ParameterType
 -- , expression      :: Expression
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- generalized_types | named_types | simple_types .
 -- class CParameterType a
@@ -729,7 +729,7 @@ type StringLiteral = Text
 -- data GenericType = GenericType {
 --   gTTypeLabel :: Maybe TypeLabel
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- type_label_id | type_label_ref .
 --
@@ -746,7 +746,7 @@ type StringLiteral = Text
 -- data GenericEntityType = GenericEntityType {
 --   gETTypeLabel :: Maybe TypeLabel
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- general_array_type | general_bag_type | general_list_type | general_set_type .
 -- class GeneralAggregationTypes a
@@ -762,14 +762,14 @@ type StringLiteral = Text
 -- , gATUnique        :: Bool
 -- , gATParameterType :: ParameterType
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- BAG [ bound_spec ] OF parameter_type .
 -- data GeneralBagType = GeneralBagType {
 --   gBTBounds        :: Maybe BoundSpec
 -- , gBTParameterType :: ParameterType
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- LIST [ bound_spec ] OF [ UNIQUE ] parameter_type .
 -- data GeneralListType = GeneralListType {
@@ -777,21 +777,21 @@ type StringLiteral = Text
 -- , unique           :: Bool
 -- , gLTParameterType :: ParameterType
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- SET [ bound_spec ] OF parameter_type .
 -- data GeneralSetType = GeneralSetType {
 --   bounds        :: Maybe BoundSpec
 -- , parameterType :: ParameterType
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- AGGREGATE [ ' : ' type_label ] OF parameter_type .
 -- data AggregateType = AggregateType {
 --   typeLabel       :: Maybe TypeLabel
 -- , aTParameterType :: ParameterType
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- attribute_decl { ' , ' attribute_decl } ' : ' [ OPTIONAL ] parameter_type ' ; ' .
 -- data ExplicitAttr = ExplicitAttr {
@@ -799,7 +799,7 @@ type StringLiteral = Text
 -- , eAOptional      :: Bool
 -- , eAParameterType :: ParameterType
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- concrete_types | constructed_types .
 -- class CUnderlyingType a
@@ -820,26 +820,26 @@ type StringLiteral = Text
 --       extensible :: Bool
 --     , body       :: Maybe (Either EnumerationItems EnumerationExtension)
 --     }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- data Extensible a = Extensible a
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- data GenericEntity = GenericEntity
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- BASED_ON type_ref [ WITH select_list ] .
 -- data SelectExtension = SelectExtension {
 --   sETypeRef    :: TypeRef
 -- , sESelectList :: Maybe SelectList
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- ' ( ' named_types { ' , ' named_types } ' ) ' .
 -- data SelectList = SelectList {
 --   sLNamedTypes :: [NamedTypes]
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 
 -- BASED_ON type_ref [ WITH enumeration_items ] .
@@ -847,20 +847,20 @@ type StringLiteral = Text
 --   eETypeRef          :: TypeRef
 -- , eEEnumerationItems :: EnumerationItems
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- ' ( ' enumeration_id { ' , ' enumeration_id } ' ) ' .
 -- data EnumerationItems = EnumerationItems {
 --   eIEnumerationItems :: [EnumerationId]
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- SUBTYPE_CONSTRAINT subtype_constraint_id FOR entity_ref ' ; ' .
 -- data SubtypeConstraintHead = SubtypeConstraintHead {
 --   sCHSubtypeConstraintId :: SubtypeConstraintId
 -- , sCHEntityRef           :: EntityRef
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- [ abstract_supertype ] [ total_over ] [ supertype_expression ' ; ' ] .
 -- data SubtypeConstraintBody = SubtypeConstraintBody {
@@ -868,17 +868,17 @@ type StringLiteral = Text
 -- , sCBTotalOver           :: Maybe TotalOver
 -- , sCBSupertypeExpression :: Maybe SupertypeExpression
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- TOTAL_OVER ' ( ' entity_ref { ' , ' entity_ref } ' ) ' ' ; ' .
 -- data TotalOver = TotalOver {
 --   tOEntityRefs :: [EntityRef]
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- ABSTRACT SUPERTYPE ' ; ' .
 -- data AbstractSupertype = AbstractSupertype
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- simple_id .
 -- type SubtypeConstraintId = SimpleId
@@ -944,7 +944,7 @@ type StringLiteral = Text
 
 --     -- SKIP ' ; ' .
 --   | SkipStmt
---   deriving Eq
+--   deriving (Eq, Show)
 
 
 -- [ increment_control ] [ while_control ] [ until_control ] .
@@ -953,19 +953,19 @@ type StringLiteral = Text
 -- , whileControl     :: Maybe WhileControl
 -- , untilControl     :: Maybe UntilControl
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- UNTIL logical_expression .
 -- data UntilControl = UntilControl {
 --   logicalExpression :: LogicalExpression
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- WHILE logical_expression .
 -- data WhileControl = WhileControl {
 --   wCLogicalExpression :: LogicalExpression
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- variable_id ' := ' bound_1 TO bound_2 [ BY increment ] .
 -- data IncrementControl = IncrementControl {
@@ -974,14 +974,14 @@ type StringLiteral = Text
 -- , bound2     :: Bound2
 -- , increment  :: Maybe Increment
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- numeric_expression .
 -- type Increment = NumericExpression
 
 -- INSERT | REMOVE .
 -- data BuiltInProcedure = INSERT | REMOVE
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- numeric_expression .
 -- type Width = NumericExpression
@@ -991,7 +991,7 @@ type StringLiteral = Text
 --   caseLabels :: [CaseLabel]
 -- , cAStmt     :: Stmt
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- expression .
 -- type CaseLabel = Expression
@@ -1005,13 +1005,13 @@ type StringLiteral = Text
 -- , aHConstantDecl :: Maybe ConstantDecl
 -- , aHLocalDecl    :: Maybe LocalDecl
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- LOCAL local_variable { local_variable } END_LOCAL ' ; ' .
 -- data LocalDecl = LocalDecl {
 --   localVariables :: [LocalVariable]
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- variable_id { ' , ' variable_id } ' : ' parameter_type [ ' := ' expression ] ' ; ' .
 -- data LocalVariable = LocalVariable {
@@ -1019,14 +1019,14 @@ type StringLiteral = Text
 -- , lVParameterType :: ParameterType
 -- , lVExpression    :: Maybe Expression
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- PROCEDURE procedure_id [ ' ( ' [ VAR ] formal_parameter { ' ; ' [ VAR ] formal_parameter } ' ) ' ] ' ; ' .
 -- data ProcedureHead = ProcedureHead {
 --   procedureId     :: ProcedureId
 -- , procedureParams :: Maybe [ProcedureParam]
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- data ProcedureParam = ProcedureParam {
 --   -- `modifiable` is True if and only if this parameter was preceded with `VAR`
@@ -1034,14 +1034,14 @@ type StringLiteral = Text
 --   modifiable      :: Bool
 -- , formalParameter :: FormalParameter
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- parameter_id { ' , ' parameter_id } ' : ' parameter_type .
 -- data FormalParameter = FormalParameter {
 --   fPParameterIds  :: [ParameterId]
 -- , fPParameterType :: ParameterType
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- FUNCTION function_id [ ' ( ' formal_parameter { ' ; ' formal_parameter } ' ) ' ] ' : ' parameter_type ' ; ' .
 -- data FunctionHead = FunctionHead {
@@ -1049,7 +1049,7 @@ type StringLiteral = Text
 -- , fHFormalParameters :: Maybe [FormalParameter]
 -- , fHReturnType       :: ParameterType
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- rel_op | IN | LIKE .
 -- data RelOpExtended =
@@ -1065,14 +1065,14 @@ type StringLiteral = Text
 --   -- WE is "weird equals", WNE is "weird not equals"
 --   | ROWNE
 --   | ROWE
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- ' ( ' width ' ) ' [ FIXED ] .
 -- data WidthSpec = WidthSpec {
 --   width :: Width
 -- , fixed :: Bool
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- numeric_expression .
 -- type PrecisionSpec = NumericExpression
@@ -1082,7 +1082,7 @@ type StringLiteral = Text
 --   sTBounds :: Maybe BoundSpec
 -- , sTType   :: InstantiableType
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- LIST [ bound_spec ] OF [ UNIQUE ] instantiable_type .
 -- data ListType = ListType {
@@ -1090,14 +1090,14 @@ type StringLiteral = Text
 -- , lTUnique    :: Bool
 -- , lTType      :: InstantiableType
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- BAG [ bound_spec ] OF instantiable_type .
 -- data BagType = BagType {
 --   bTBoundSpec :: Maybe BoundSpec
 -- , bTType      :: InstantiableType
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- ARRAY bound_spec OF [ OPTIONAL ] [ UNIQUE ] instantiable_type .
 -- data ArrayType = ArrayType {
@@ -1106,7 +1106,7 @@ type StringLiteral = Text
 -- , aTUnique   :: Bool
 -- , aTType     :: InstantiableType
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- named_types [ AS ( entity_id | type_id ) ] .
 -- data NamedTypeOrRename = NamedTypeOrRename {
@@ -1122,14 +1122,14 @@ type StringLiteral = Text
 -- , rDStmts         :: Maybe [Stmt]
 -- , rDWhereClause   :: WhereClause
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- RULE rule_id FOR ' ( ' entity_ref { ' , ' entity_ref } ' ) ' ' ; ' .
 -- data RuleHead = RuleHead {
 --   ruleId     :: RuleId
 -- , entityRefs :: [EntityRef]
 -- }
---   deriving Eq
+--   deriving (Eq, Show)
 
 -- simple_id .
 -- type RuleId = SimpleId
