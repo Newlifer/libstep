@@ -30,13 +30,12 @@ type SchemaId = SimpleId
 type SchemaVersionId = StringLiteral
 
 -- { interface_specification } [ constant_decl ] { declaration | rule_decl } .
-data SchemaBody = SchemaBody
--- data SchemaBody = SchemaBody {
---   interfaces    :: Maybe [InterfaceSpecification]
+data SchemaBody = SchemaBody {
+  interfaces    :: Maybe [InterfaceSpecification]
 -- , constant      :: Maybe ConstantDecl
 -- , declaractions :: Maybe [Declaration]
 -- , rules         :: Maybe [RuleDecl]
--- }
+}
   deriving (Eq, Show)
 
 -- letter { letter | digit | ' _ ' } .
@@ -50,34 +49,34 @@ type SimpleId = Text
 type StringLiteral = Text
 
 -- reference_clause | use_clause .
--- data InterfaceSpecification =
---     -- REFERENCE FROM schema_ref [ ' ( ' resource_or_rename { ' , ' resource_or_rename } ' ) ' ] ' ; ' .
---     ReferenceClause {
---       schemaRef :: SchemaRef
---     , resources :: Maybe [ResourceOrRename]
---     }
---     -- USE FROM schema_ref [ ' ( ' named_type_or_rename { ' , ' named_type_or_rename } ' ) ' ] ' ; ' .
---   | UseClause {
---       uCSchemaRef         :: SchemaRef
---     , namedTypesOrRenames :: Maybe [NamedTypeOrRename]
---     }
---   deriving Eq
+data InterfaceSpecification =
+    -- REFERENCE FROM schema_ref [ ' ( ' resource_or_rename { ' , ' resource_or_rename } ' ) ' ] ' ; ' .
+    ReferenceClause {
+      schemaRef :: SchemaRef
+    , resources :: Maybe [ResourceOrRename]
+    }
+    -- USE FROM schema_ref [ ' ( ' named_type_or_rename { ' , ' named_type_or_rename } ' ) ' ] ' ; ' .
+  | UseClause {
+      uCSchemaRef         :: SchemaRef
+    , namedTypesOrRenames :: Maybe [NamedTypeOrRename]
+    }
+  deriving (Eq, Show)
 
 -- schema_id .
--- type SchemaRef = SchemaId
+type SchemaRef = SchemaId
 
 -- resource_ref [ AS rename_id ] .
--- data ResourceOrRename = ResourceOrRename {
---   resourceRef :: ResourceRef
--- , renameId    :: Maybe RenameId
--- }
---   deriving Eq
+data ResourceOrRename = ResourceOrRename {
+  resourceRef :: ResourceRef
+, renameId    :: Maybe RenameId
+}
+  deriving (Eq, Show)
 
 -- constant_ref | entity_ref | function_ref | procedure_ref | type_ref .
 --
 -- Since all refs are mapped into ids, which in turn are equivalent to
 -- simple_id, we just skip to the end.
--- type ResourceRef = SimpleId
+type ResourceRef = SimpleId
 
 -- constant_id .
 -- type ConstantRef = ConstantId
@@ -98,13 +97,13 @@ type StringLiteral = Text
 --
 -- In the end, all the IDs are SimpleId, so let's just skip the intermediate
 -- step.
--- type RenameId = SimpleId
+type RenameId = SimpleId
 
 -- simple_id .
 -- type ConstantId = SimpleId
 
 -- simple_id .
--- type EntityId = SimpleId
+type EntityId = SimpleId
 
 -- simple_id .
 -- type FunctionId = SimpleId
@@ -113,7 +112,7 @@ type StringLiteral = Text
 -- type ProcedureId = SimpleId
 
 -- simple_id .
--- type TypeId = SimpleId
+type TypeId = SimpleId
 
 -- CONSTANT constant_body { constant_body } END_CONSTANT ' ; ' .
 -- data ConstantDecl = ConstantDecl {
@@ -716,7 +715,7 @@ type StringLiteral = Text
 -- entity_ref | type_ref .
 --
 -- In the end, it's SimpleId.
--- type NamedTypes = SimpleId
+type NamedTypes = SimpleId
 
 -- aggregate_type | general_aggregation_types | generic_entity_type | generic_type .
 -- class GeneralizedTypes a
@@ -1109,11 +1108,11 @@ type StringLiteral = Text
 --   deriving (Eq, Show)
 
 -- named_types [ AS ( entity_id | type_id ) ] .
--- data NamedTypeOrRename = NamedTypeOrRename {
---   nTORNamedTypes :: NamedTypes
--- , as             :: Maybe (Either EntityId TypeId)
--- }
---   deriving Eq
+data NamedTypeOrRename = NamedTypeOrRename {
+  nTORNamedTypes :: NamedTypes
+, as             :: Maybe (Either EntityId TypeId)
+}
+  deriving (Eq, Show)
 
 -- rule_head algorithm_head { stmt } where_clause END_RULE ' ; ' .
 -- data RuleDecl = RuleDecl {

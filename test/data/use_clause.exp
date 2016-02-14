@@ -1,0 +1,3 @@
+SCHEMA s1;
+USE FROM s2 ( e1 AS e2 );
+END_SCHEMA;

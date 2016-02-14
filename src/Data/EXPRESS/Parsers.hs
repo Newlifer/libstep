@@ -82,14 +82,16 @@ pSchemaVersionId = pStringLiteral
 -- { interface_specification } [ constant_decl ] { declaration | rule_decl } .
 pSchemaBody :: Parser SchemaBody
 pSchemaBody = do
---   interfaces' <- many' pInterfaceSpecification
---   let interfaces = listToMaybe interfaces'
+  skipWhitespace
+  interfaces' <- many' pInterfaceSpecification
+  let interfaces = listToMaybe interfaces'
 --   constants <- optional pConstantDecl
 --   other <- many' (eitherP pDeclaration pRuleDecl)
 --   let declarations = listToMaybe $ lefts other
 --   let rules = listToMaybe $ rights other
 --   return $ SchemaBody interfaces constants declarations rules
-  return $ SchemaBody
+  skipWhitespace
+  return $ SchemaBody interfaces
 
 -- letter { letter | digit | ' _ ' } .
 pSimpleId :: Parser SimpleId
@@ -192,3 +194,114 @@ pStringLiteral = choice [pSimpleStringLiteral, pEncodedStringLiteral]
 
     pHexDigit :: Parser Word8
     pHexDigit = satisfy (\x -> (isDigit x) || (x >= 0x61 && x <= 0x66)) <?> "hex digit"
+
+pInterfaceSpecification :: Parser InterfaceSpecification
+pInterfaceSpecification = choice [pReference, pUse]
+  where
+  -- REFERENCE FROM schema_ref [ ' ( ' resource_or_rename { ' , ' resource_or_rename } ' ) ' ] ' ; ' .
+  pReference = do
+    skipWhitespace
+    string "REFERENCE"
+    skipWhitespace1
+    string "FROM"
+    skipWhitespace1
+    ref <- pSchemaRef
+    resources <- optional $ do
+      skipWhitespace
+      string "("
+      skipWhitespace
+      res1 <- pResourceOrRename
+      rest <- many' $ do
+        skipWhitespace
+        string ","
+        skipWhitespace
+        pResourceOrRename
+      skipWhitespace
+      string ")"
+      return $ res1 : rest
+    skipWhitespace
+    string ";"
+    skipWhitespace
+    return $ ReferenceClause ref resources
+
+  -- USE FROM schema_ref [ ' ( ' named_type_or_rename { ' , ' named_type_or_rename } ' ) ' ] ' ; ' .
+  pUse = do
+    skipWhitespace
+    string "USE"
+    skipWhitespace1
+    string "FROM"
+    skipWhitespace1
+    ref <- pSchemaRef
+    renames <- optional $ do
+      skipWhitespace
+      string "("
+      skipWhitespace
+      rename1 <- pNamedTypeOrRename
+      rest <- many' $ do
+        skipWhitespace
+        string ","
+        skipWhitespace
+        pNamedTypeOrRename
+      skipWhitespace
+      string ")"
+      return $ rename1 : rest
+    skipWhitespace
+    string ";"
+    skipWhitespace
+    return $ UseClause ref renames
+
+-- schema_id .
+pSchemaRef :: Parser SchemaRef
+pSchemaRef = pSchemaId
+
+-- resource_ref [ AS rename_id ] .
+pResourceOrRename :: Parser ResourceOrRename
+pResourceOrRename = do
+  ref <- pResourceRef
+  as_id <- optional $ do
+    skipWhitespace1
+    string "AS"
+    skipWhitespace1
+    pRenameId
+  return $ ResourceOrRename ref as_id
+
+-- constant_ref | entity_ref | function_ref | procedure_ref | type_ref .
+--
+-- Since all refs are mapped into ids, which in turn are equivalent to
+-- simple_id, we just skip to the end.
+pResourceRef :: Parser ResourceRef
+pResourceRef = pSimpleId
+
+-- constant_id | entity_id | function_id | procedure_id | type_id .
+--
+-- In the end, all the IDs are SimpleId, so let's just skip the intermediate
+-- step.
+pRenameId :: Parser RenameId
+pRenameId = pSimpleId
+
+-- named_types [ AS ( entity_id | type_id ) ] .
+pNamedTypeOrRename :: Parser NamedTypeOrRename
+pNamedTypeOrRename = do
+  skipWhitespace
+  ref <- pNamedTypes
+  as_id <- optional $ do
+    skipWhitespace1
+    string "AS"
+    skipWhitespace1
+    eitherP pEntityId pTypeId
+  skipWhitespace
+  return $ NamedTypeOrRename ref as_id
+
+-- entity_ref | type_ref .
+--
+-- In the end, it's SimpleId.
+pNamedTypes :: Parser NamedTypes
+pNamedTypes = pSimpleId
+
+-- simple_id .
+pEntityId :: Parser EntityId
+pEntityId = pSimpleId
+
+-- simple_id .
+pTypeId :: Parser TypeId
+pTypeId = pSimpleId
