@@ -15,7 +15,6 @@ import Data.Word
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
-import qualified Data.Text.Encoding.Error as TEE
 
 import Data.EXPRESS.Schema
 
@@ -152,7 +151,7 @@ pSimpleId = do
     then return $ T.empty
     else do
       rest <- takeWhile (\x -> isLetter x || isDigit x || isUnderscore x)
-      return $ TE.decodeUtf8With (TEE.replace '*') (start `BS.append` rest)
+      return $ TE.decodeUtf8 (start `BS.append` rest)
 
   where
   isUnderscore :: Word8 -> Bool
