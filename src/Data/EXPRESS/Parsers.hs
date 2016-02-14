@@ -34,6 +34,7 @@ listToMaybe xs = Just xs
 pExpress :: Parser Express
 pExpress = do
   schemas <- many1 pSchema
+  skipWhitespace
   endOfInput <?> "unexpected end of file"
   return $ Express schemas
 

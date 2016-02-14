@@ -6,6 +6,8 @@ import Data.Attoparsec.ByteString.Char8
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.Text as T
 
+import System.IO (withFile, IOMode(ReadMode))
+
 import Data.STEP.Parsers
 import Data.EXPRESS.Schema
 import Data.EXPRESS.Parsers
@@ -30,19 +32,19 @@ createStepParsersSpecs = testSpec "Parsing STEP" $ parallel $
 createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
   describe "success cases" $ do
     it "should parse empty schema" $
-      shouldParse
-        ((C8.pack "SCHEMA\tdesign\n;\n\n END_SCHEMA ;") ~> pExpress)
-        (Express [
-          Schema
-            (T.pack "design")
-            Nothing
-            SchemaBody])
+      withFile "test/data/empty.exp" ReadMode $ \h -> do
+        schema <- C8.hGetContents h
+        shouldParse
+          (schema ~> pExpress)
+          (Express [Schema (T.pack "design") Nothing SchemaBody])
 
     it "should parse schema with version id" $
-      shouldParse
-        ((C8.pack "SCHEMA design '{ISO standard 10303 part(41) object(1)\n\tversion(9)}' ;\nEND_SCHEMA;") ~> pExpress)
-        (Express [
-          Schema
-            (T.pack "design")
-            (Just $ T.pack "{ISO standard 10303 part(41) object(1)\n\tversion(9)}")
-            SchemaBody])
+      withFile "test/data/version_id.exp" ReadMode $ \h -> do
+        schema <- C8.hGetContents h
+        shouldParse
+          (schema ~> pExpress)
+          (Express [
+            Schema
+              (T.pack "design")
+              (Just $ T.pack "{ISO standard 10303 part(41) object(1)\n\tversion(9)}")
+              SchemaBody])

@@ -1,0 +1,4 @@
+SCHEMA design '{ISO standard 10303 part(41) object(1)
+	version(9)}';
+
+END_SCHEMA;
