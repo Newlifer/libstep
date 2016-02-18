@@ -32,7 +32,7 @@ type SchemaVersionId = StringLiteral
 -- { interface_specification } [ constant_decl ] { declaration | rule_decl } .
 data SchemaBody = SchemaBody {
   interfaces    :: Maybe [InterfaceSpecification]
--- , constant      :: Maybe ConstantDecl
+  sInterfaces    :: Maybe [InterfaceSpecification]
 -- , declaractions :: Maybe [Declaration]
 -- , rules         :: Maybe [RuleDecl]
 }

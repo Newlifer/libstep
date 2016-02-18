@@ -7,10 +7,10 @@ module Data.EXPRESS.Parsers (
 import Prelude hiding (takeWhile)
 
 import Control.Applicative (optional)
-import Control.Monad (void)
+import Control.Monad (void, liftM)
 import Data.Attoparsec.ByteString
-import Data.Either
-import Data.Word
+import Data.Maybe (isJust)
+import Data.Word (Word8())
 
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
@@ -28,55 +28,29 @@ listToMaybe :: [a] -> Maybe [a]
 listToMaybe [] = Nothing
 listToMaybe xs = Just xs
 
-{- ^ `enclosed left right sep p` pads a call to `sepBy1 p sep` with `left >>
- - sep` and `sep >> right`.
- -
- - Useful to parse brace-enclosed things, like that:
- -
- -    enclosed
- -      (string "(")
- -      (string ")")
- -      (many1 $ word8 0x20)
- -      (word8 0x41)
- -
- - (this will parse things like "(  A      A  A A         A)" and return ['A',
- - 'A', 'A', 'A', 'A'])
- -}
-enclosed :: Parser a
-         -> Parser b
-         -> Parser c
-         -> Parser d
-         -> Parser [d]
-enclosed left right sep p = do
-  left
-  result <- p `sepBy1` sep
-  right
+between :: Parser a
+        -> Parser b
+        -> Parser d
+        -> Parser d
+between left right p = do
+  void $ left
+  result <- p
+  void $ right
   return result
 
--- ^ Parses a list enclosed into parenthesis
-parens :: Parser a
-       -> Parser b
-       -> Parser [b]
-parens sep p =
-  enclosed
-    (string "(" >> skipWhitespace)
-    (string ")" >> skipWhitespace)
-    sep
-    p
+parens :: Parser a -> Parser a
+parens =
+  between
+    (keyword "(")
+    (keyword ")")
 
 -- ^ A comma with optional whitespace on either side
 commaSep :: Parser ()
-commaSep = void $ do
-  skipWhitespace
-  string ","
-  skipWhitespace
+commaSep = keyword ","
 
 -- ^ "AS" keywords with non-optional whitespace on either side
 asSep :: Parser ()
-asSep = void $ do
-  skipWhitespace1
-  string "AS"
-  skipWhitespace1
+asSep = keyword1 "AS"
 
 keyword :: BS.ByteString -> Parser ()
 keyword k = (string k <?> "keyword") *> skipWhitespace
@@ -115,28 +89,19 @@ skipWhitespace1 = do
 
 -- SCHEMA schema_id [ schema_version_id ] ' ; ' schema_body END_SCHEMA ' ; ' .
 pSchema :: Parser Schema
-pSchema = do
-  string "SCHEMA" <?> "SCHEMA keyword"
-  skipWhitespace1
-  id <- pSchemaId
-  skipWhitespace
-  versionId <- optional pSchemaVersionId
-  skipWhitespace
-  string ";" <?> "semicolon after schema id"
-  skipWhitespace
-  body <- pSchemaBody
-  string "END_SCHEMA" <?> "END_SCHEMA keyword"
-  skipWhitespace
-  string ";"
-  return $ Schema id versionId body
+pSchema =
+  Schema <$>
+    (keyword1 "SCHEMA" *> pSchemaId) <*>
+    (optional pSchemaVersionId <* keyword ";") <*>
+    (pSchemaBody <* (keyword "END_SCHEMA" *> keyword ";"))
 
 -- simple_id .
 pSchemaId :: Parser SchemaId
-pSchemaId = pSimpleId
+pSchemaId = lexeme pSimpleId
 
 -- string_literal .
 pSchemaVersionId :: Parser SchemaVersionId
-pSchemaVersionId = pStringLiteral
+pSchemaVersionId = lexeme pStringLiteral
 
 -- { interface_specification } [ constant_decl ] { declaration | rule_decl } .
 pSchemaBody :: Parser SchemaBody
@@ -183,9 +148,9 @@ pStringLiteral = choice [pSimpleStringLiteral, pEncodedStringLiteral]
   -- \q { ( \q \q ) | not_quote | \s | \x9 | \xA | \xD } \q .
   pSimpleStringLiteral :: Parser T.Text
   pSimpleStringLiteral = do
-    word8 apostrophe
+    void $ word8 apostrophe
     literal <- many' $ choice [pQQ, pNotQuote, pWhitespace]
-    word8 apostrophe
+    void $ word8 apostrophe
     return $ TE.decodeUtf8 $ BS.concat literal
 
     where
@@ -194,8 +159,8 @@ pStringLiteral = choice [pSimpleStringLiteral, pEncodedStringLiteral]
 
     pQQ :: Parser BS.ByteString
     pQQ = do
-      word8 apostrophe
-      word8 apostrophe
+      void $ word8 apostrophe
+      void $ word8 apostrophe
       return $ BS.pack [apostrophe, apostrophe]
 
     pNotQuote :: Parser BS.ByteString
@@ -223,9 +188,9 @@ pStringLiteral = choice [pSimpleStringLiteral, pEncodedStringLiteral]
   -- ' " ' encoded_character { encoded_character } ' " ' .
   pEncodedStringLiteral :: Parser T.Text
   pEncodedStringLiteral = do
-    word8 quote
+    void $ word8 quote
     str <- many1 pEncodedCharacter
-    word8 quote
+    void $ word8 quote
     return $ T.concat str
     where
     quote :: Word8
@@ -259,84 +224,64 @@ pInterfaceSpecification = choice [pReference, pUse]
   where
   -- REFERENCE FROM schema_ref [ ' ( ' resource_or_rename { ' , ' resource_or_rename } ' ) ' ] ' ; ' .
   pReference = do
-    skipWhitespace
-    string "REFERENCE"
-    skipWhitespace1
-    string "FROM"
-    skipWhitespace1
+    keyword1 "REFERENCE"
+    keyword1 "FROM"
     ref <- pSchemaRef
-    resources <- optional $ do
-      skipWhitespace
-      parens commaSep pResourceOrRename
-    skipWhitespace
-    string ";"
-    skipWhitespace
-    return $ ReferenceClause ref resources
+    res <- optional $ parens $ (lexeme pResourceOrRename) `sepBy1` commaSep
+    keyword ";"
+    return $ ReferenceClause ref res
 
   -- USE FROM schema_ref [ ' ( ' named_type_or_rename { ' , ' named_type_or_rename } ' ) ' ] ' ; ' .
   pUse = do
-    skipWhitespace
-    string "USE"
-    skipWhitespace1
-    string "FROM"
-    skipWhitespace1
+    keyword1 "USE"
+    keyword1 "FROM"
     ref <- pSchemaRef
-    renames <- optional $ do
-      skipWhitespace
-      parens commaSep pNamedTypeOrRename
-    skipWhitespace
-    string ";"
-    skipWhitespace
-    return $ UseClause ref renames
+    names <- optional $ parens $ (lexeme pNamedTypeOrRename) `sepBy1` commaSep
+    keyword ";"
+    return $ UseClause ref names
 
 -- schema_id .
 pSchemaRef :: Parser SchemaRef
-pSchemaRef = pSchemaId
+pSchemaRef = lexeme pSchemaId
 
 -- resource_ref [ AS rename_id ] .
 pResourceOrRename :: Parser ResourceOrRename
-pResourceOrRename = do
-  ref <- pResourceRef
-  as_id <- optional $ do
-    asSep
-    pRenameId
-  return $ ResourceOrRename ref as_id
+pResourceOrRename =
+  ResourceOrRename <$>
+    (lexeme pResourceRef) <*>
+    (optional $ asSep *> pRenameId)
 
 -- constant_ref | entity_ref | function_ref | procedure_ref | type_ref .
 --
 -- Since all refs are mapped into ids, which in turn are equivalent to
 -- simple_id, we just skip to the end.
 pResourceRef :: Parser ResourceRef
-pResourceRef = pSimpleId
+pResourceRef = lexeme pSimpleId
 
 -- constant_id | entity_id | function_id | procedure_id | type_id .
 --
 -- In the end, all the IDs are SimpleId, so let's just skip the intermediate
 -- step.
 pRenameId :: Parser RenameId
-pRenameId = pSimpleId
+pRenameId = lexeme pSimpleId
 
 -- named_types [ AS ( entity_id | type_id ) ] .
 pNamedTypeOrRename :: Parser NamedTypeOrRename
-pNamedTypeOrRename = do
-  skipWhitespace
-  ref <- pNamedTypes
-  as_id <- optional $ do
-    asSep
-    eitherP pEntityId pTypeId
-  skipWhitespace
-  return $ NamedTypeOrRename ref as_id
+pNamedTypeOrRename =
+  NamedTypeOrRename <$>
+    (lexeme pNamedTypes) <*>
+    (optional $ asSep *> (lexeme $ eitherP pEntityId pTypeId))
 
 -- entity_ref | type_ref .
 --
 -- In the end, it's SimpleId.
 pNamedTypes :: Parser NamedTypes
-pNamedTypes = pSimpleId
+pNamedTypes = lexeme pSimpleId
 
 -- simple_id .
 pEntityId :: Parser EntityId
-pEntityId = pSimpleId
+pEntityId = lexeme pSimpleId
 
 -- simple_id .
 pTypeId :: Parser TypeId
-pTypeId = pSimpleId
+pTypeId = lexeme pSimpleId
