@@ -66,6 +66,7 @@ lexeme p = p <* skipWhitespace
 -- schema_decl { schema_decl } .
 pExpress :: Parser Express
 pExpress = do
+  skipWhitespace
   schemas <- many1 pSchema
   skipWhitespace
   endOfInput <?> "unexpected end of file"
