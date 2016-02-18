@@ -5,8 +5,8 @@ module Data.STEP.Parsers (
 , parseStep
 ) where
 
+import Control.Monad (void)
 import Data.Attoparsec.ByteString.Char8
-import Data.Word
 
 data Vector = Vector [Double]
   deriving (Show, Eq)
@@ -23,21 +23,18 @@ groupFinish = ')'
 spaceSkip :: Parser [Char]
 spaceSkip = many' $ satisfy $ inClass [' ', '\t']
 
-sepParser :: Parser [Char]
-sepParser = spaceSkip >> char delimiter >> spaceSkip
-
 parseVectorElement :: Parser Double
 parseVectorElement = do
-    spaceSkip
+    void $ spaceSkip
     x <- double
-    spaceSkip
+    void $ spaceSkip
     return $ x
 
 parseVector :: Parser Vector
 parseVector = do
-    char groupStart
+    void $ char groupStart
     result <- parseVectorElement `sepBy` (char delimiter)
-    char groupFinish
+    void $ char groupFinish
     return $ Vector result
 
 parseStep :: Parser Vector

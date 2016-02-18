@@ -2,7 +2,6 @@ import Test.Hspec.Attoparsec
 import Test.Tasty
 import Test.Tasty.Hspec
 
-import Data.Attoparsec.ByteString.Char8
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.Text as T
 
@@ -19,6 +18,7 @@ main = do
   let tests = testGroup "Tests" [stepParsersSpecs, expressParsersSpecs]
   defaultMain tests
 
+createStepParsersSpecs :: IO TestTree
 createStepParsersSpecs = testSpec "Parsing STEP" $ parallel $
   describe "success cases" $ do
     it "should parse case #1" $
@@ -29,6 +29,7 @@ createStepParsersSpecs = testSpec "Parsing STEP" $ parallel $
       (C8.pack "(1.0,2.0,3.0,4.0)") ~> parseStep
         `shouldParse` (Vector [1.0, 2.0, 3.0, 4.0])
 
+createExpressParsersSpecs :: IO TestTree
 createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
   describe "success cases" $ do
     it "should parse empty schema" $
