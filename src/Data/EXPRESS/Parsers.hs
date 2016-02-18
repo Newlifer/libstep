@@ -78,6 +78,15 @@ asSep = void $ do
   string "AS"
   skipWhitespace1
 
+keyword :: BS.ByteString -> Parser ()
+keyword k = (string k <?> "keyword") *> skipWhitespace
+
+keyword1 :: BS.ByteString -> Parser ()
+keyword1 k = (string k <?> "keyword") *> skipWhitespace1
+
+lexeme :: Parser a -> Parser a
+lexeme p = p <* skipWhitespace
+
 
 
 -- schema_decl { schema_decl } .
