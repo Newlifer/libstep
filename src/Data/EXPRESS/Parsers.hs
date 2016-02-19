@@ -53,10 +53,14 @@ asSep :: Parser ()
 asSep = keyword1 "AS"
 
 keyword :: BS.ByteString -> Parser ()
-keyword k = (string k <?> "keyword") *> skipWhitespace
+keyword k = do
+  _ <- string k <?> (T.unpack $ TE.decodeUtf8 k) ++ " expected"
+  skipWhitespace
 
 keyword1 :: BS.ByteString -> Parser ()
-keyword1 k = (string k <?> "keyword") *> skipWhitespace1
+keyword1 k = do
+  _ <- string k <?> (T.unpack $ TE.decodeUtf8 k) ++ " expected"
+  skipWhitespace1
 
 lexeme :: Parser a -> Parser a
 lexeme p = p <* skipWhitespace
