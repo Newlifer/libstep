@@ -21,8 +21,9 @@ library
   hs-source-dirs:      src
   exposed-modules:     Data.STEP
                      , Data.STEP.Parsers
-                     , Data.EXPRESS.Schema
+                     , Data.EXPRESS.Internal.Parsers
                      , Data.EXPRESS.Parsers
+                     , Data.EXPRESS.Schema
   build-depends:       base >= 4.7 && < 5
                      , attoparsec
                      , bytestring
@@ -35,9 +36,8 @@ test-suite libstep-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             test.hs
-  build-depends:       base
-                     , libstep
-
+  build-depends:       libstep
+                     , base
                      , attoparsec
                      , bytestring
                      , hspec-attoparsec

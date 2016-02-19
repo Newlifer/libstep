@@ -9,7 +9,7 @@ import System.IO (withFile, IOMode(ReadMode))
 
 import Data.STEP.Parsers
 import Data.EXPRESS.Schema
-import Data.EXPRESS.Parsers
+import Data.EXPRESS.Internal.Parsers
 
 main :: IO ()
 main = do
