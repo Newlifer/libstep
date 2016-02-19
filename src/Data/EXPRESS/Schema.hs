@@ -9,6 +9,7 @@ module Data.EXPRESS.Schema where
  - use Maybe [...] instead.
  -}
 
+import Data.Scientific (Scientific())
 import Data.Text (Text)
 
 -- schema_decl { schema_decl } .
@@ -17,9 +18,9 @@ data Express = Express [Schema]
 
 -- SCHEMA schema_id [ schema_version_id ] ' ; ' schema_body END_SCHEMA ' ; ' .
 data Schema = Schema {
-  id      :: SchemaId
-, version :: Maybe SchemaVersionId
-, sBody   :: SchemaBody
+  sId      :: SchemaId
+, sVersion :: Maybe SchemaVersionId
+, sBody    :: SchemaBody
 }
   deriving (Eq, Show)
 
@@ -31,8 +32,8 @@ type SchemaVersionId = StringLiteral
 
 -- { interface_specification } [ constant_decl ] { declaration | rule_decl } .
 data SchemaBody = SchemaBody {
-  interfaces    :: Maybe [InterfaceSpecification]
   sInterfaces    :: Maybe [InterfaceSpecification]
+, sConstants     :: Maybe ConstantDecl
 -- , declaractions :: Maybe [Declaration]
 -- , rules         :: Maybe [RuleDecl]
 }
@@ -52,13 +53,13 @@ type StringLiteral = Text
 data InterfaceSpecification =
     -- REFERENCE FROM schema_ref [ ' ( ' resource_or_rename { ' , ' resource_or_rename } ' ) ' ] ' ; ' .
     ReferenceClause {
-      schemaRef :: SchemaRef
-    , resources :: Maybe [ResourceOrRename]
+      rcSchemaRef :: SchemaRef
+    , rcResources :: Maybe [ResourceOrRename]
     }
     -- USE FROM schema_ref [ ' ( ' named_type_or_rename { ' , ' named_type_or_rename } ' ) ' ] ' ; ' .
   | UseClause {
-      uCSchemaRef         :: SchemaRef
-    , namedTypesOrRenames :: Maybe [NamedTypeOrRename]
+      ucSchemaRef           :: SchemaRef
+    , ucNamedTypesOrRenames :: Maybe [NamedTypeOrRename]
     }
   deriving (Eq, Show)
 
@@ -67,8 +68,8 @@ type SchemaRef = SchemaId
 
 -- resource_ref [ AS rename_id ] .
 data ResourceOrRename = ResourceOrRename {
-  resourceRef :: ResourceRef
-, renameId    :: Maybe RenameId
+  rorResourceRef :: ResourceRef
+, rorRenameId    :: Maybe RenameId
 }
   deriving (Eq, Show)
 
@@ -79,19 +80,13 @@ data ResourceOrRename = ResourceOrRename {
 type ResourceRef = SimpleId
 
 -- constant_id .
--- type ConstantRef = ConstantId
-
--- entity_id .
--- type EntityRef = EntityId
+type ConstantRef = ConstantId
 
 -- function_id .
--- type FunctionRef = FunctionId
+type FunctionRef = FunctionId
 
 -- procedure_id .
 -- type ProcedureRef = ProcedureId
-
--- type_id .
--- type TypeRef = TypeId
 
 -- constant_id | entity_id | function_id | procedure_id | type_id .
 --
@@ -100,13 +95,13 @@ type ResourceRef = SimpleId
 type RenameId = SimpleId
 
 -- simple_id .
--- type ConstantId = SimpleId
+type ConstantId = SimpleId
 
 -- simple_id .
 type EntityId = SimpleId
 
 -- simple_id .
--- type FunctionId = SimpleId
+type FunctionId = SimpleId
 
 -- simple_id .
 -- type ProcedureId = SimpleId
@@ -115,70 +110,78 @@ type EntityId = SimpleId
 type TypeId = SimpleId
 
 -- CONSTANT constant_body { constant_body } END_CONSTANT ' ; ' .
--- data ConstantDecl = ConstantDecl {
---   cbody :: Maybe [ConstantBody]
--- }
---   deriving (Eq, Show)
+data ConstantDecl = ConstantDecl {
+  cdBody :: [ConstantBody]
+}
+  deriving (Eq, Show)
 
 -- constant_id ' : ' instantiable_type ' := ' expression ' ; ' .
--- data ConstantBody = ConstantBody {
---   cid          :: ConstantId
--- , type_        :: InstantiableType
--- , cBExpression :: Expression
--- }
---   deriving (Eq, Show)
+data ConstantBody = ConstantBody {
+  cbIid        :: ConstantId
+, cbType       :: EXPRESSType
+, cbExpression :: Expression
+}
+  deriving (Eq, Show)
 
--- concrete_types | entity_ref .
--- class CInstantiableType a
--- instance ConcreteTypes a => CInstantiableType a
--- instance CInstantiableType EntityRef
-
--- data InstantiableType = forall a. CInstantiableType a => InstantiableType a
--- instance Eq InstantiableType where
---   (InstantiableType a) == (InstantiableType b) = a == b
-
--- aggregation_types | simple_types | type_ref .
--- class ConcreteTypes a
--- instance AggregationTypes a => ConcreteTypes a
--- instance ConcreteTypes SimpleTypes
--- instance ConcreteTypes TypeRef
-
--- array_type | bag_type | list_type | set_type .
--- class AggregationTypes a
--- instance AggregationTypes ArrayType
--- instance AggregationTypes BagType
--- instance AggregationTypes ListType
--- instance AggregationTypes SetType
-
--- binary_type | boolean_type | integer_type | logical_type | number_type | real_type | string_type .
--- data SimpleTypes =
---     -- BINARY [ width_spec ] .
---     BinaryType {
---       bTWidthSpec :: Maybe WidthSpec
---     }
---     -- BOOLEAN .
---   | BooleanType
---     -- INTEGER .
---   | IntegerType
---     -- LOGICAL .
---   | LogicalType
---     -- NUMBER .
---   | NumberType
---     -- REAL [ ' ( ' precision_spec ' ) ' ] .
---   | RealType {
---       precisionSpec :: Maybe PrecisionSpec
---     }
---     -- STRING [ width_spec ] .
---   | StringType {
---       widthSpec :: Maybe WidthSpec
---     }
---   deriving (Eq, Show)
+data EXPRESSType =
+    -- BINARY [ width_spec ] .
+    BinaryType {
+      btWidthSpec :: Maybe WidthSpec
+    }
+    -- BOOLEAN .
+  | BooleanType
+    -- INTEGER .
+  | IntegerType
+    -- LOGICAL .
+  | LogicalType
+    -- NUMBER .
+  | NumberType
+    -- REAL [ ' ( ' precision_spec ' ) ' ] .
+  | RealType {
+      rtPrecisionSpec :: Maybe PrecisionSpec
+    }
+    -- STRING [ width_spec ] .
+  | StringType {
+      stWidthSpec :: Maybe WidthSpec
+    }
+    -- SET [ bound_spec ] OF instantiable_type .
+  | SetType {
+      stBounds :: Maybe BoundSpec
+    , stType   :: EXPRESSType
+    }
+    -- LIST [ bound_spec ] OF [ UNIQUE ] instantiable_type .
+  | ListType {
+      ltBoundSpec :: Maybe BoundSpec
+    , ltUnique    :: Bool
+    , ltType      :: EXPRESSType
+    }
+    -- BAG [ bound_spec ] OF instantiable_type .
+  | BagType {
+      btBoundSpec :: Maybe BoundSpec
+    , btType      :: EXPRESSType
+    }
+    -- ARRAY bound_spec OF [ OPTIONAL ] [ UNIQUE ] instantiable_type .
+  | ArrayType {
+      atBounds   :: BoundSpec
+    , atOptional :: Bool
+    , atUnique   :: Bool
+    , atType     :: EXPRESSType
+    }
+    -- entity_id .
+  | EntityRef {
+      erId :: EntityId
+    }
+    -- type_id .
+  | TypeRef {
+      trId :: TypeId
+    }
+  deriving (Eq, Show)
 
 -- simple_expression [ rel_op_extended simple_expression ] .
--- data Expression where
---   ESimple :: SimpleExpression -> Expression
---   EOp :: SimpleExpression -> RelOpExtended -> SimpleExpression -> Expression
---   deriving (Eq, Show)
+data Expression where
+  ESimple :: SimpleExpression -> Expression
+  EOp :: SimpleExpression -> RelOpExtended -> SimpleExpression -> Expression
+  deriving (Eq, Show)
 
 -- entity_decl | function_decl | procedure_decl | subtype_constraint_decl | type_decl .
 -- data Declaration =
@@ -330,24 +333,6 @@ type TypeId = SimpleId
 -- }
 --   deriving (Eq, Show)
 
--- ' . ' attribute_ref .
--- data AttributeQualifier = AttributeQualifier {
---   aQAttributeRef :: AttributeRef
--- }
---   deriving (Eq, Show)
-
--- attribute_id .
--- type AttributeRef = AttributeId
-
--- simple_id .
--- type AttributeId = SimpleId
-
--- ' \ ' entity_ref .
--- data GroupQualifier = GroupQualifier {
---   gQEntityRef :: EntityRef
--- }
---   deriving (Eq, Show)
-
 -- INVERSE inverse_attr { inverse_attr } .
 -- data InverseClause = InverseClause {
 --   inverseAttrs :: [InverseAttr]
@@ -374,138 +359,159 @@ type TypeId = SimpleId
 --   deriving (Eq, Show)
 
 -- ' [ ' bound_1 ' : ' bound_2 ' ] ' .
--- data BoundSpec = BoundSpec {
---   bSBound1 :: Bound1
--- , bSBound2 :: Bound2
--- }
---   deriving (Eq, Show)
+data BoundSpec = BoundSpec {
+  bsBound1 :: Bound1
+, bsBound2 :: Bound2
+}
+  deriving (Eq, Show)
 
 -- numeric_expression .
--- type Bound1 = NumericExpression
+type Bound1 = NumericExpression
 
 -- numeric_expression .
--- type Bound2 = NumericExpression
+type Bound2 = NumericExpression
 
 -- simple_expression .
--- type NumericExpression = SimpleExpression
+type NumericExpression = SimpleExpression
 
 -- term { add_like_op term } .
--- data SimpleExpression where
---   SETerm :: Term -> SimpleExpression
---   SEAddLikeOp :: Term -> AddLikeOp -> Term -> SimpleExpression
---   deriving (Eq, Show)
+data SimpleExpression where
+  SETerm :: Term -> SimpleExpression
+  SEAddLikeOp :: Term -> AddLikeOp -> Term -> SimpleExpression
+  deriving (Eq, Show)
 
 -- factor { multiplication_like_op factor } .
--- data Term where
---   TFactor :: Factor -> Term
---   TMultiplicationLikeOp :: Factor -> MultiplicationLikeOp -> Factor -> Term
---   deriving (Eq, Show)
+data Term where
+  TFactor :: Factor -> Term
+  TMultiplicationLikeOp :: Factor -> MultiplicationLikeOp -> Factor -> Term
+  deriving (Eq, Show)
 
 -- simple_factor [ ' ** ' simple_factor ] .
--- data Factor =
---     FSimpleFactor :: SimpleFactor a => a -> Factor
---   | FSPow :: (SimpleFactor a, SimpleFactor b) => a -> b -> Factor
---   deriving (Eq, Show)
+data Factor where
+  FSimpleFactor :: SimpleFactor -> Factor
+  FSPow :: SimpleFactor -> SimpleFactor -> Factor
+  deriving (Eq, Show)
 
 -- aggregate_initializer | entity_constructor | enumeration_reference | interval | query_expression | ( [ unary_op ] ( ' ( ' expression ' ) ' | primary ) ) .
--- class SimpleFactor a
--- instance SimpleFactor AggregateInitializer
--- instance SimpleFactor EntityConstructor
--- instance SimpleFactor EnumerationReference
--- instance SimpleFactor Interval
--- instance SimpleFactor QueryExpression
--- instance SimpleFactor UnaryOppedSF
-
--- data UnaryOppedSF = UnaryOppedSF {
---   unaryOp  :: Maybe UnaryOp
--- , uOSFBody :: Either Expression Primary
--- }
---   deriving (Eq, Show)
+data SimpleFactor =
+    -- ' [ ' [ element { ' , ' element } ] ' ] ' .
+    AggregateInitializer {
+      aiElements :: Maybe [Element]
+    }
+    -- entity_ref ' ( ' [ expression { ' , ' expression } ] ' ) ' .
+  | EntityConstructor {
+      ecEntityRef   :: EXPRESSType
+    , ecExpressions :: Maybe [Expression]
+    }
+    -- [ type_ref ' . ' ] enumeration_ref .
+  | EnumerationReference {
+      erTypeRef        :: Maybe EXPRESSType
+    , erEnumerationRef :: EnumerationRef
+    }
+    -- ' { ' interval_low interval_op interval_item interval_op interval_high ' } ' .
+  | Interval {
+      intervalLow  :: IntervalLow
+    , intervalOp   :: IntervalOp
+    , intervalItem :: IntervalItem
+    , intervalOp2  :: IntervalOp
+    , intervalHigh :: IntervalHigh
+    }
+    -- QUERY ' ( ' variable_id ' <* ' aggregate_source ' | ' logical_expression ' ) ' .
+  | QueryExpression {
+      qeVariableId        :: VariableId
+    , qeAggregateSource   :: AggregateSource
+    , qeLogicalExpression :: LogicalExpression
+    }
+  | UnaryOppedSF {
+      uosfUnaryOp :: Maybe UnaryOp
+    , uosfBody    :: Either Expression Primary
+    }
+  deriving (Eq, Show)
 
 -- literal | ( qualifiable_factor { qualifier } ) .
--- class CPrimary a
--- instance CPrimary Literal
--- instance CPrimary QualifiableFactorWithQualifiers
-
--- data Primary = forall a. CPrimary a => Primary a
--- instance Eq Primary where
---   (Primary a) == (Primary b) = a == b
-
--- data QualifiableFactorWithQualifiers = forall a. QualifiableFactor a =>
---     QualifiableFactorWithQualifiers {
---       qfwqFactor    :: a
---     , qfwqQualifier :: Maybe [Qualifier]
---     }
--- instance Eq QualifiableFactorWithQualifiers where
---   (==)
---     (QualifiableFactorWithQualifiers a1 a2)
---     (QualifiableFactorWithQualifiers b1 b2)
---     =
---     (a1 == b1) && (a2 == b2)
+data Primary where
+  PLiteral :: Literal -> Primary
+  PQualifiableFactorWithQualifiers ::
+      QualifiableFactor -> Maybe [Qualifier] -> Primary
+  deriving (Eq, Show)
 
 -- attribute_qualifier | group_qualifier | index_qualifier .
--- class CQualifier a
--- instance CQualifier AttributeQualifier
--- instance CQualifier GroupQualifier
--- instance CQualifier IndexQualifier
+data Qualifier =
+    -- ' . ' attribute_ref .
+    AttributeQualifier {
+      aqAttributeRef :: AttributeRef
+    }
+    -- ' \ ' entity_ref .
+  | GroupQualifier {
+      gqEntityRef :: EXPRESSType
+    }
+    -- ' [ ' index_1 [ ' : ' index_2 ] ' ] ' .
+  | IndexQualifier {
+      iqIndex1 :: Index1
+    , iqIndex2 :: Maybe Index2
+    }
+  deriving (Eq, Show)
 
--- data Qualifier = forall a. CQualifier a => Qualifier a
--- instance Eq Qualifier where
---   (Qualifier a) == (Qualifier b) = a == b
+-- attribute_id .
+type AttributeRef = AttributeId
 
--- ' [ ' index_1 [ ' : ' index_2 ] ' ] ' .
--- data IndexQualifier = IndexQualifier {
---   index1 :: Index1
--- , index2 :: Maybe Index2
--- }
---   deriving (Eq, Show)
+-- simple_id .
+type AttributeId = SimpleId
 
 -- index .
--- type Index1 = Index
+type Index1 = Index
 
 -- index .
--- type Index2 = Index
+type Index2 = Index
 
 -- numeric_expression .
--- type Index = NumericExpression
+type Index = NumericExpression
 
 -- attribute_ref | constant_factor | function_call | general_ref | population .
--- class QualifiableFactor a
--- instance QualifiableFactor ConstantFactor
--- instance QualifiableFactor FunctionCall
--- Squashing instances for AttributeRef, GeneralRef and Population into once
--- since they're both SimpleIds
--- instance QualifiableFactor SimpleId
-
--- built_in_constant | constant_ref .
--- class CConstantFactor a
--- instance CConstantFactor BuiltInConstant
--- instance CConstantFactor ConstantRef
-
--- data ConstantFactor = forall a. CConstantFactor a => ConstantFactor a
--- instance Eq ConstantFactor where
---   (ConstantFactor a) == (ConstantFactor b) = a == b
+data QualifiableFactor =
+    -- attribute_ref
+    QFAttributeRef {
+      qfAttributeRef :: AttributeRef
+    }
+    -- constant_factor:
+    -- built_in_constant | constant_ref .
+  | QFBuiltInConstant {
+      qfBuiltInConstant :: BuiltInConstant
+    }
+  | QFConstantRef {
+      qfConstantRef :: ConstantRef
+    }
+  | QFFunctionCall {
+      qfFunctionCall :: FunctionCall
+    }
+  | QFGeneralRef {
+      qfGeneralRef :: GeneralRef
+    }
+  | QFPopulation {
+      qfPopulation :: Population
+    }
+  deriving (Eq, Show)
 
 -- ( built_in_function | function_ref ) [ actual_parameter_list ] .
--- data FunctionCall = FunctionCall {
---   begin :: Either BuiltInFunction FunctionRef
--- , params :: Maybe ActualParameterList
--- }
---   deriving (Eq, Show)
+data FunctionCall = FunctionCall {
+  fcBegin  :: Either BuiltInFunction FunctionRef
+, fcParams :: Maybe ActualParameterList
+}
+  deriving (Eq, Show)
 
 -- parameter_ref | variable_ref .
 --
 -- It's all SimpleId in the end
--- type GeneralRef = SimpleId
+type GeneralRef = SimpleId
 
 -- entity_ref .
--- type Population = EntityRef
+type Population = EXPRESSType
 
 -- variable_id .
--- type VariableRef = VariableId
+type VariableRef = VariableId
 
 -- simple_id .
--- type VariableId = SimpleId
+type VariableId = SimpleId
 
 -- parameter_id .
 -- type ParameterRef = ParameterId
@@ -514,163 +520,140 @@ type TypeId = SimpleId
 -- type ParameterId = SimpleId
 
 -- ' ( ' parameter { ' , ' parameter } ' ) ' .
--- data ActualParameterList = ActualParameterList {
---   parameters :: [Parameter]
--- }
---   deriving (Eq, Show)
+data ActualParameterList = ActualParameterList {
+  aplParameters :: [Parameter]
+}
+  deriving (Eq, Show)
 
 -- expression .
--- type Parameter = Expression
+type Parameter = Expression
 
 -- ABS | ACOS | ASIN | ATAN | BLENGTH | COS | EXISTS | EXP | FORMAT | HIBOUND | HIINDEX | LENGTH | LOBOUND | LOINDEX | LOG | LOG2 | LOG10 | NVL | ODD | ROLESOF | SIN | SIZEOF | SQRT | TAN | TYPEOF | USEDIN | VALUE | VALUE_IN | VALUE_UNIQUE .
--- data BuiltInFunction =
---     ABS
---   | ACOS
---   | ASIN
---   | ATAN
---   | BLENGTH
---   | COS
---   | EXISTS
---   | EXP
---   | FORMAT
---   | HIBOUND
---   | HIINDEX
---   | LENGTH
---   | LOBOUND
---   | LOINDEX
---   | LOG
---   | LOG2
---   | LOG10
---   | NVL
---   | ODD
---   | ROLESOF
---   | SIN
---   | SIZEOF
---   | SQRT
---   | TAN
---   | TYPEOF
---   | USEDIN
---   | VALUE
---   | VALUE_IN
---   | VALUE_UNIQUE
---   deriving (Eq, Show)
+data BuiltInFunction =
+    ABS
+  | ACOS
+  | ASIN
+  | ATAN
+  | BLENGTH
+  | COS
+  | EXISTS
+  | EXP
+  | FORMAT
+  | HIBOUND
+  | HIINDEX
+  | LENGTH
+  | LOBOUND
+  | LOINDEX
+  | LOG
+  | LOG2
+  | LOG10
+  | NVL
+  | ODD
+  | ROLESOF
+  | SIN
+  | SIZEOF
+  | SQRT
+  | TAN
+  | TYPEOF
+  | USEDIN
+  | VALUE
+  | VALUE_IN
+  | VALUE_UNIQUE
+  deriving (Eq, Show)
 
 -- CONST_E | PI | SELF | ' ? ' .
--- data BuiltInConstant = CONST_E | PI | SELF | QuestionMark
---   deriving (Eq, Show)
+data BuiltInConstant = CONST_E | PI | SELF | QuestionMark
+  deriving (Eq, Show)
 
--- binary_literal | logical_literal | real_literal | string_literal .
--- class CLiteral a
--- instance CLiteral BinaryLiteral
--- instance CLiteral LogicalLiteral
--- instance CLiteral RealLiteral
--- instance CLiteral StringLiteral
-
--- data Literal = forall a. CLiteral a => Literal a
-
--- nteger_literal | ( digits ' . ' [ digits ] [ ' e ' [ sign ] digits ] ) .
--- data RealLiteral = RealLiteral
---   deriving (Eq, Show)
+-- binary_literal | logical_literal | integer_literal | real_literal | string_literal .
+data Literal =
+    -- ' % ' bit { bit } .
+    BinaryLiteral {
+      blBits :: [Bit]
+    }
+    -- FALSE | TRUE | UNKNOWN .
+  | LLogicalLiteral {
+      lLogicalLiteral :: LogicalLiteral
+    }
+    -- integer_literal
+  | IntegerLiteral {
+      lIntegerLiteral :: Integer
+    }
+    -- digits ' . ' [ digits ] [ ' e ' [ sign ] digits ]
+  | RealLiteral {
+      lRealLiteral :: Scientific
+    }
+  | LStringLiteral {
+      lStringLiteral :: StringLiteral
+    }
+  deriving (Eq, Show)
 
 -- FALSE | TRUE | UNKNOWN .
--- data LogicalLiteral = FALSE | TRUE | UNKNOWN
---   deriving (Eq, Show)
-
--- ' % ' bit { bit } .
--- data BinaryLiteral = BinaryLiteral {
---   bits :: [Bit]
--- }
---   deriving (Eq, Show)
+data LogicalLiteral = FALSE | TRUE | UNKNOWN
+  deriving (Eq, Show)
 
 -- ' 0 ' | ' 1 ' .
--- data Bit = Zero | One
---   deriving (Eq, Show)
+data Bit = Zero | One
+  deriving (Eq, Show)
 
 -- ' + ' | ' - ' | NOT .
--- data UnaryOp = UPlus | UMinus | UNOT
---   deriving (Eq, Show)
-
--- QUERY ' ( ' variable_id ' <* ' aggregate_source ' | ' logical_expression ' ) ' .
--- data QueryExpression = QueryExpression {
---   qEVariableId        :: VariableId
--- , aggregateSource     :: AggregateSource
--- , qELogicalExpression :: LogicalExpression
--- }
---   deriving (Eq, Show)
+data UnaryOp = UPlus | UMinus | UNOT
+  deriving (Eq, Show)
 
 -- expression .
--- type LogicalExpression = Expression
+type LogicalExpression = Expression
 
 -- simple_expression .
--- type AggregateSource = SimpleExpression
-
--- ' { ' interval_low interval_op interval_item interval_op interval_high ' } ' .
--- data Interval = Interval {
---   intervalLow  :: IntervalLow
--- , intervalOp   :: IntervalOp
--- , intervalItem :: IntervalItem
--- , intervalOp2  :: IntervalOp
--- , intervalHigh :: IntervalHigh
--- }
---   deriving (Eq, Show)
+type AggregateSource = SimpleExpression
 
 -- simple_expression .
--- type IntervalLow = SimpleExpression
+type IntervalLow = SimpleExpression
 
 -- simple_expression .
--- type IntervalHigh = SimpleExpression
+type IntervalHigh = SimpleExpression
 
 -- simple_expression .
--- type IntervalItem = SimpleExpression
+type IntervalItem = SimpleExpression
 
 -- ' < ' | ' <= ' .
--- data IntervalOp = Less | LessEqual
---   deriving (Eq, Show)
-
--- [ type_ref ' . ' ] enumeration_ref .
--- data EnumerationReference = EnumerationReference {
---   typeRef        :: Maybe TypeRef
--- , enumerationRef :: EnumerationRef
--- }
---   deriving (Eq, Show)
+data IntervalOp =
+    Less
+  | LessEqual
+  deriving (Eq, Show)
 
 -- enumeration_id .
--- type EnumerationRef = EnumerationId
+type EnumerationRef = EnumerationId
 
 -- simple_id .
--- type EnumerationId = SimpleId
-
--- entity_ref ' ( ' [ expression { ' , ' expression } ] ' ) ' .
--- data EntityConstructor = EntityConstructor {
---   entityRef   :: EntityRef
--- , expressions :: Maybe [Expression]
--- }
---   deriving (Eq, Show)
-
--- ' [ ' [ element { ' , ' element } ] ' ] ' .
--- data AggregateInitializer = AggregateInitializer {
---   elements :: Maybe [Element]
--- }
---   deriving (Eq, Show)
+type EnumerationId = SimpleId
 
 -- expression [ ' : ' repetition ] .
--- data Element = Element {
---   eExpression :: Expression
--- , repetition  :: Maybe Repetition
--- }
---   deriving (Eq, Show)
+data Element = Element {
+  eExpression :: Expression
+, rRepetition :: Maybe Repetition
+}
+  deriving (Eq, Show)
 
 -- numeric_expression .
--- type Repetition = NumericExpression
+type Repetition = NumericExpression
 
 -- ' * ' | ' / ' | DIV | MOD | AND | ' || ' .
--- `Or` is `||`
--- data MultiplicationLikeOp = Times | Divide | DIV | MOD | AND | Or
---   deriving (Eq, Show)
+data MultiplicationLikeOp =
+    Times
+  | Divide
+  | DIV
+  | MOD
+  | AND
+  | Or  -- '||'
+  deriving (Eq, Show)
 
 -- ' + ' | ' - ' | OR | XOR .
--- data AddLikeOp = Plus | Minus | OR | XOR
---   deriving (Eq, Show)
+data AddLikeOp =
+    Plus
+  | Minus
+  | OR
+  | XOR
+  deriving (Eq, Show)
 
 -- attribute_id | redeclared_attribute .
 -- class CAttributeDecl a
@@ -983,7 +966,7 @@ type NamedTypes = SimpleId
 --   deriving (Eq, Show)
 
 -- numeric_expression .
--- type Width = NumericExpression
+type Width = NumericExpression
 
 -- case_label { ' , ' case_label } ' : ' stmt .
 -- data CaseAction = CaseAction {
@@ -1051,66 +1034,35 @@ type NamedTypes = SimpleId
 --   deriving (Eq, Show)
 
 -- rel_op | IN | LIKE .
--- data RelOpExtended =
---     OpIN
---   | OpLIKE
---   -- ' < ' | ' > ' | ' <= ' | ' >= ' | ' <> ' | ' = ' | ' :<>: ' | ' :=: ' .
---   | ROL
---   | ROG
---   | ROLE
---   | ROGE
---   | RONE
---   | ROE
---   -- WE is "weird equals", WNE is "weird not equals"
---   | ROWNE
---   | ROWE
---   deriving (Eq, Show)
+data RelOpExtended =
+    OpIN
+  | OpLIKE
+  -- ' < ' | ' > ' | ' <= ' | ' >= ' | ' <> ' | ' = ' | ' :<>: ' | ' :=: ' .
+  | ROL
+  | ROG
+  | ROLE
+  | ROGE
+  | RONE
+  | ROE
+  -- WE is "weird equals", WNE is "weird not equals"
+  | ROWNE
+  | ROWE
+  deriving (Eq, Show)
 
 -- ' ( ' width ' ) ' [ FIXED ] .
--- data WidthSpec = WidthSpec {
---   width :: Width
--- , fixed :: Bool
--- }
---   deriving (Eq, Show)
+data WidthSpec = WidthSpec {
+  wsWidth :: Width
+, wsFixed :: Bool
+}
+  deriving (Eq, Show)
 
 -- numeric_expression .
--- type PrecisionSpec = NumericExpression
-
--- SET [ bound_spec ] OF instantiable_type .
--- data SetType = SetType {
---   sTBounds :: Maybe BoundSpec
--- , sTType   :: InstantiableType
--- }
---   deriving (Eq, Show)
-
--- LIST [ bound_spec ] OF [ UNIQUE ] instantiable_type .
--- data ListType = ListType {
---   lTBoundSpec :: Maybe BoundSpec
--- , lTUnique    :: Bool
--- , lTType      :: InstantiableType
--- }
---   deriving (Eq, Show)
-
--- BAG [ bound_spec ] OF instantiable_type .
--- data BagType = BagType {
---   bTBoundSpec :: Maybe BoundSpec
--- , bTType      :: InstantiableType
--- }
---   deriving (Eq, Show)
-
--- ARRAY bound_spec OF [ OPTIONAL ] [ UNIQUE ] instantiable_type .
--- data ArrayType = ArrayType {
---   aTBounds   :: BoundSpec
--- , aTOptional :: Bool
--- , aTUnique   :: Bool
--- , aTType     :: InstantiableType
--- }
---   deriving (Eq, Show)
+type PrecisionSpec = NumericExpression
 
 -- named_types [ AS ( entity_id | type_id ) ] .
 data NamedTypeOrRename = NamedTypeOrRename {
-  nTORNamedTypes :: NamedTypes
-, as             :: Maybe (Either EntityId TypeId)
+  ntorNamedTypes :: NamedTypes
+, ntorAs         :: Maybe (Either EntityId TypeId)
 }
   deriving (Eq, Show)
 

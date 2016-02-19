@@ -6,10 +6,12 @@ module Data.EXPRESS.Parsers (
 
 import Prelude hiding (takeWhile)
 
-import Control.Applicative (optional)
+import Control.Applicative ((<|>), optional)
 import Control.Monad (void, liftM)
 import Data.Attoparsec.ByteString
+import Data.List (foldl')
 import Data.Maybe (isJust)
+import Data.Scientific (Scientific(), scientific)
 import Data.Word (Word8())
 
 import qualified Data.ByteString as BS
@@ -27,6 +29,15 @@ import Data.EXPRESS.Schema
 listToMaybe :: [a] -> Maybe [a]
 listToMaybe [] = Nothing
 listToMaybe xs = Just xs
+
+digitsToInteger :: [Int] -> Integer
+digitsToInteger [] = 0
+digitsToInteger [i] = fromIntegral i
+digitsToInteger (start:rest) =
+  foldl'
+    (\acc i -> acc * 10 + fromIntegral i)
+    (fromIntegral start)
+    rest
 
 between :: Parser a
         -> Parser b
@@ -71,7 +82,7 @@ lexeme p = p <* skipWhitespace
 pExpress :: Parser Express
 pExpress = do
   skipWhitespace
-  schemas <- many1 pSchema
+  schemas <- many1 $ lexeme pSchema
   skipWhitespace
   endOfInput <?> "unexpected end of file"
   return $ Express schemas
@@ -96,9 +107,9 @@ skipWhitespace1 = do
 pSchema :: Parser Schema
 pSchema =
   Schema <$>
-    (keyword1 "SCHEMA" *> pSchemaId) <*>
-    (optional pSchemaVersionId <* keyword ";") <*>
-    (pSchemaBody <* (keyword "END_SCHEMA" *> keyword ";"))
+    (keyword1 "SCHEMA" *> (lexeme pSchemaId)) <*>
+    (optional (lexeme pSchemaVersionId) <* keyword ";") <*>
+    ((lexeme pSchemaBody) <* (keyword "END_SCHEMA" *> keyword ";"))
 
 -- simple_id .
 pSchemaId :: Parser SchemaId
@@ -111,16 +122,14 @@ pSchemaVersionId = lexeme pStringLiteral
 -- { interface_specification } [ constant_decl ] { declaration | rule_decl } .
 pSchemaBody :: Parser SchemaBody
 pSchemaBody = do
-  skipWhitespace
-  interfaces' <- many' pInterfaceSpecification
+  interfaces' <- many' $ lexeme pInterfaceSpecification
   let interfaces = listToMaybe interfaces'
---   constants <- optional pConstantDecl
+  constants <- optional $ lexeme pConstantDecl
 --   other <- many' (eitherP pDeclaration pRuleDecl)
 --   let declarations = listToMaybe $ lefts other
 --   let rules = listToMaybe $ rights other
 --   return $ SchemaBody interfaces constants declarations rules
-  skipWhitespace
-  return $ SchemaBody interfaces
+  return $ SchemaBody interfaces constants
 
 -- letter { letter | digit | ' _ ' } .
 pSimpleId :: Parser SimpleId
@@ -141,6 +150,21 @@ isLetter ch = (ch >= 0x41 && ch <= 0x5A) -- capital letters
            || (ch >= 0x61 && ch <= 0x7A) -- small letters
 
 isDigit ch = ch >= 0x30 && ch <= 0x39
+
+pDigit :: Parser Int
+pDigit = (word8 0x30 *> pure 0)
+     <|> (word8 0x31 *> pure 1)
+     <|> (word8 0x32 *> pure 2)
+     <|> (word8 0x33 *> pure 3)
+     <|> (word8 0x34 *> pure 4)
+     <|> (word8 0x35 *> pure 5)
+     <|> (word8 0x36 *> pure 6)
+     <|> (word8 0x37 *> pure 7)
+     <|> (word8 0x38 *> pure 8)
+     <|> (word8 0x39 *> pure 9)
+
+pInteger :: Parser Integer
+pInteger = digitsToInteger <$> many1 pDigit
 
 {- \q { ( \q \q ) | not_quote | \s | \x9 | \xA | \xD } \q .
 
@@ -240,7 +264,7 @@ pInterfaceSpecification = choice [pReference, pUse]
   pUse = do
     keyword1 "USE"
     keyword1 "FROM"
-    ref <- pSchemaRef
+    ref <- lexeme pSchemaRef
     names <- optional $ parens $ (lexeme pNamedTypeOrRename) `sepBy1` commaSep
     keyword ";"
     return $ UseClause ref names
@@ -290,3 +314,590 @@ pEntityId = lexeme pSimpleId
 -- simple_id .
 pTypeId :: Parser TypeId
 pTypeId = lexeme pSimpleId
+
+-- CONSTANT constant_body { constant_body } END_CONSTANT ' ; ' .
+pConstantDecl :: Parser ConstantDecl
+pConstantDecl = do
+  keyword1 "CONSTANT"
+  bodies <- many1 $ lexeme pConstantBody
+  keyword "END_CONSTANT"
+  keyword ";"
+  return $ ConstantDecl bodies
+
+-- constant_id ' : ' instantiable_type ' := ' expression ' ; ' .
+pConstantBody :: Parser ConstantBody
+pConstantBody = do
+  ConstantBody <$>
+    (lexeme pConstantId <* keyword ":") <*>
+    (lexeme pInstantiableType <* keyword ":=") <*>
+    (lexeme pExpression <* keyword ";")
+
+-- simple_id .
+pConstantId :: Parser ConstantId
+pConstantId = lexeme pSimpleId
+
+-- concrete_types | entity_ref .
+pInstantiableType :: Parser EXPRESSType
+pInstantiableType = lexeme $ choice [pConcreteTypes, pEntityRef]
+
+-- aggregation_types | simple_types | type_ref .
+pConcreteTypes :: Parser EXPRESSType
+pConcreteTypes = lexeme $ choice [pAggregationTypes, pSimpleTypes, pTypeRef]
+
+-- array_type | bag_type | list_type | set_type .
+pAggregationTypes :: Parser EXPRESSType
+pAggregationTypes = lexeme $ choice [pArrayType, pBagType, pListType, pSetType]
+
+-- entity_id .
+pEntityRef :: Parser EXPRESSType
+pEntityRef = EntityRef <$> lexeme pEntityId
+
+-- simple_expression [ rel_op_extended simple_expression ] .
+pExpression :: Parser Expression
+pExpression = lexeme $ choice [pExpressionSimple, pExpressionOp]
+
+pExpressionSimple :: Parser Expression
+pExpressionSimple = ESimple <$> lexeme pSimpleExpression
+
+pExpressionOp :: Parser Expression
+pExpressionOp =
+  EOp <$>
+    (lexeme pSimpleExpression) <*>
+    (lexeme pRelOpExtended) <*>
+    (lexeme pSimpleExpression)
+
+-- term { add_like_op term } .
+pSimpleExpression :: Parser SimpleExpression
+pSimpleExpression =
+  lexeme $ choice [
+      pSimpleExpressionTerm
+    , pSimpleExpressionAddLikeOp
+    ]
+
+pSimpleExpressionTerm :: Parser SimpleExpression
+pSimpleExpressionTerm = SETerm <$> lexeme pTerm
+
+pSimpleExpressionAddLikeOp :: Parser SimpleExpression
+pSimpleExpressionAddLikeOp =
+  SEAddLikeOp <$>
+    lexeme pTerm <*>
+    lexeme pAddLikeOp <*>
+    lexeme pTerm
+
+-- rel_op | IN | LIKE .
+-- and rel_op is:
+-- ' < ' | ' > ' | ' <= ' | ' >= ' | ' <> ' | ' = ' | ' :<>: ' | ' := :' .
+pRelOpExtended :: Parser RelOpExtended
+pRelOpExtended =
+  lexeme $ choice [
+      keyword "<"     *> pure ROL
+    , keyword ">"     *> pure ROG
+    , keyword "<="    *> pure ROLE
+    , keyword ">="    *> pure ROGE
+    , keyword "<>"    *> pure RONE
+    , keyword "="     *> pure ROE
+    , keyword ":<>:"  *> pure ROWNE
+    , keyword ":=:"   *> pure ROWE
+    , keyword "IN"    *> pure OpIN
+    , keyword1 "LIKE" *> pure OpLIKE
+    ]
+
+-- binary_type | boolean_type | integer_type | logical_type | number_type | real_type | string_type .
+pSimpleTypes :: Parser EXPRESSType
+pSimpleTypes =
+  lexeme $ choice [
+      -- BINARY [ width_spec ] .
+      BinaryType <$> (keyword1 "BINARY" *> (optional $ lexeme pWidthSpec))
+
+      -- BOOLEAN .
+    , keyword1 "BOOLEAN" *> pure BooleanType
+
+      -- INTEGER .
+    , keyword1 "INTEGER" *> pure IntegerType
+
+      -- LOGICAL .
+    , keyword1 "LOGICAL" *> pure LogicalType
+
+      -- NUMBER .
+    , keyword1 "NUMBER" *> pure NumberType
+
+      -- REAL [ ' ( ' precision_spec ' ) ' ] .
+    , lexeme pRealType
+
+      -- STRING [ width_spec ] .
+    , StringType <$> (keyword1 "STRING" *> (optional $ lexeme pWidthSpec))
+    ]
+  where
+  -- ' ( ' width ' ) ' [ FIXED ] .
+  pWidthSpec :: Parser WidthSpec
+  pWidthSpec =
+    WidthSpec <$>
+      (parens $ lexeme pWidth) <*>
+      (liftM isJust $ optional $ keyword "FIXED")
+
+  -- numeric_expression .
+  -- ...that translates to...
+  -- simple_expression .
+  pWidth :: Parser Width
+  pWidth = lexeme pSimpleExpression
+
+  -- REAL [ ' ( ' precision_spec ' ) ' ] .
+  pRealType :: Parser EXPRESSType
+  pRealType = RealType <$>
+    (keyword1 "REAL" *> (optional $ lexeme pNumericExpression))
+
+-- type_id .
+pTypeRef :: Parser EXPRESSType
+pTypeRef = TypeRef <$> lexeme pTypeId
+
+-- ARRAY bound_spec OF [ OPTIONAL ] [ UNIQUE ] instantiable_type .
+pArrayType :: Parser EXPRESSType
+pArrayType = do
+  keyword1 "ARRAY"
+  bounds <- lexeme pBoundSpec
+  keyword1 "OF"
+  opt <- liftM isJust $ optional $ keyword1 "OPTIONAL"
+  uniq <- liftM isJust $ optional $ keyword1 "UNIQUE"
+  t <- lexeme pInstantiableType
+  return $ ArrayType bounds opt uniq t
+
+-- BAG [ bound_spec ] OF instantiable_type .
+pBagType :: Parser EXPRESSType
+pBagType = do
+  keyword1 "BAG"
+  bounds <- optional $ lexeme pBoundSpec
+  keyword1 "OF"
+  t <- lexeme pInstantiableType
+  return $ BagType bounds t
+
+-- LIST [ bound_spec ] OF [ UNIQUE ] instantiable_type .
+pListType :: Parser EXPRESSType
+pListType = do
+  keyword1 "LIST"
+  bounds <- optional $ lexeme pBoundSpec
+  keyword1 "OF"
+  uniq <- liftM isJust $ optional $ keyword1 "UNIQUE"
+  t <- lexeme pInstantiableType
+  return $ ListType bounds uniq t
+
+-- SET [ bound_spec ] OF instantiable_type .
+pSetType :: Parser EXPRESSType
+pSetType = do
+  keyword1 "SET"
+  bounds <- optional $ lexeme pBoundSpec
+  keyword1 "OF"
+  t <- lexeme pInstantiableType
+  return $ SetType bounds t
+
+-- factor { multiplication_like_op factor } .
+pTerm :: Parser Term
+pTerm = TFactor <$> (lexeme pFactor)
+    <|> TMultiplicationLikeOp <$>
+          (lexeme pFactor) <*>
+          (lexeme pMultiplicationLikeOp) <*>
+          (lexeme pFactor)
+
+-- ' + ' | ' - ' | OR | XOR .
+pAddLikeOp :: Parser AddLikeOp
+pAddLikeOp =
+  lexeme $ choice [
+      keyword1 "+"   *> pure Plus
+    , keyword1 "-"   *> pure Minus
+    , keyword1 "OR"  *> pure OR
+    , keyword1 "XOR" *> pure XOR
+    ]
+
+-- simple_expression .
+pNumericExpression :: Parser NumericExpression
+pNumericExpression = lexeme pSimpleExpression
+
+-- ' [ ' bound_1 ' : ' bound_2 ' ] ' .
+pBoundSpec :: Parser BoundSpec
+pBoundSpec = do
+  keyword "["
+  b1 <- lexeme pBound1
+  keyword ":"
+  b2 <- lexeme pBound2
+  keyword "]"
+  return $ BoundSpec b1 b2
+
+-- simple_factor [ ' ** ' simple_factor ] .
+pFactor :: Parser Factor
+pFactor = FSimpleFactor <$> (lexeme pSimpleFactor)
+      <|> FSPow <$>
+            (lexeme pSimpleFactor <* keyword "**") <*>
+            (lexeme pSimpleFactor)
+
+-- ' * ' | ' / ' | DIV | MOD | AND | ' || ' .
+pMultiplicationLikeOp :: Parser MultiplicationLikeOp
+pMultiplicationLikeOp =
+  lexeme $ choice [
+      keyword  "*"   *> pure Times
+    , keyword  "/"   *> pure Divide
+    , keyword1 "DIV" *> pure DIV
+    , keyword1 "MOD" *> pure MOD
+    , keyword1 "AND" *> pure AND
+    , keyword  "||"  *> pure Or
+    ]
+
+-- aggregate_initializer | entity_constructor | enumeration_reference | interval | query_expression | ( [ unary_op ] ( ' ( ' expression ' ) ' | primary ) ) .
+pSimpleFactor :: Parser SimpleFactor
+pSimpleFactor =
+  lexeme $ choice [
+      pAggregateInitializer
+    , pEntityConstructor
+    , pEnumerationReference
+    , pInterval
+    , pQueryExpression
+    , pUnaryOppedSF
+    ]
+  where
+    -- ' [ ' [ element { ' , ' element } ] ' ] ' .
+    pAggregateInitializer = do
+      keyword "["
+      elements <- optional $ (lexeme pElement) `sepBy1` commaSep
+      keyword "]"
+      return $ AggregateInitializer elements
+
+    -- entity_ref ' ( ' [ expression { ' , ' expression } ] ' ) ' .
+    pEntityConstructor = do
+      eref <- lexeme pEntityRef
+      keyword "("
+      exprs <- optional $ (lexeme pExpression) `sepBy1` commaSep
+      keyword ")"
+      return $ EntityConstructor eref exprs
+
+    -- [ type_ref ' . ' ] enumeration_ref .
+    pEnumerationReference =
+      EnumerationReference <$>
+        (optional $ lexeme pTypeRef) <*>
+        (lexeme pEnumerationRef)
+
+    -- ' { ' interval_low interval_op interval_item interval_op interval_high ' } ' .
+    pInterval =
+      Interval <$>
+        (keyword "{" *> lexeme pIntervalLow) <*>
+        (lexeme pIntervalOp) <*>
+        (lexeme pIntervalItem) <*>
+        (lexeme pIntervalOp) <*>
+        (lexeme pIntervalHigh <* keyword "}")
+
+    -- QUERY ' ( ' variable_id ' <* ' aggregate_source ' | ' logical_expression ' ) ' .
+    pQueryExpression = do
+      keyword1 "QUERY"
+      keyword "("
+      vid <- lexeme pVariableId
+      keyword "<*"
+      source <- pAggregateSource
+      keyword "|"
+      expr <- pLogicalExpression
+      keyword ")"
+      return $ QueryExpression vid source expr
+
+    -- [ unary_op ] ( ' ( ' expression ' ) ' | primary ) .
+    pUnaryOppedSF =
+      UnaryOppedSF <$>
+        (optional $ lexeme pUnaryOp) <*>
+        (lexeme $ eitherP
+          (parens $ lexeme pExpression)
+          (lexeme pPrimary))
+
+-- expression [ ' : ' repetition ] .
+pElement :: Parser Element
+pElement =
+  Element <$>
+    (lexeme pExpression) <*>
+    (optional $ keyword ":" *> lexeme pRepetition)
+
+-- enumeration_id .
+pEnumerationRef :: Parser EnumerationRef
+pEnumerationRef = lexeme pEnumerationId
+
+-- simple_id .
+pEnumerationId :: Parser EnumerationId
+pEnumerationId = lexeme pSimpleId
+
+-- simple_expression .
+pIntervalLow :: Parser IntervalLow
+pIntervalLow = lexeme pSimpleExpression
+
+-- ' < ' | ' <= ' .
+pIntervalOp :: Parser IntervalOp
+pIntervalOp =
+  lexeme $ choice [
+      keyword "<"  *> pure Less
+    , keyword "<=" *> pure LessEqual
+    ]
+
+-- simple_expression .
+pIntervalItem :: Parser IntervalItem
+pIntervalItem = lexeme pSimpleExpression
+
+-- simple_expression .
+pIntervalHigh :: Parser IntervalHigh
+pIntervalHigh = lexeme pSimpleExpression
+
+-- numeric_expression .
+pBound1 :: Parser Bound1
+pBound1 = lexeme pNumericExpression
+
+-- numeric_expression .
+pBound2 :: Parser Bound2
+pBound2 = lexeme pNumericExpression
+
+-- simple_id .
+pVariableId :: Parser VariableId
+pVariableId = lexeme pSimpleId
+
+-- simple_expression .
+pAggregateSource :: Parser AggregateSource
+pAggregateSource = pSimpleExpression
+
+-- expression .
+pLogicalExpression :: Parser LogicalExpression
+pLogicalExpression = pExpression
+
+-- ' + ' | ' - ' | NOT .
+pUnaryOp :: Parser UnaryOp
+pUnaryOp =
+  lexeme $ choice [
+      keyword "+"   *> pure UPlus
+    , keyword "-"   *> pure UMinus
+    , keyword "NOT" *> pure UNOT
+    ]
+
+-- literal | ( qualifiable_factor { qualifier } ) .
+pPrimary :: Parser Primary
+pPrimary = PLiteral <$> (lexeme pLiteral)
+       <|> PQualifiableFactorWithQualifiers <$>
+             (lexeme pQualifiableFactor) <*>
+             (optional $ lexeme $ many' pQualifier)
+
+-- binary_literal | logical_literal | real_literal | string_literal .
+pLiteral :: Parser Literal
+pLiteral =
+  lexeme $ choice [
+      -- ' % ' bit { bit } .
+      BinaryLiteral <$> (keyword "%" *> many1 (lexeme pBit))
+
+      -- FALSE | TRUE | UNKNOWN .
+    , LLogicalLiteral <$> (lexeme pLogicalLiteral)
+
+      {-digits .
+      ...that translates into...
+      digit { digit } .
+      ...which turns into...
+      digit = ' 0 ' | ' 1 ' | ' 2 ' | ' 3 ' | ' 4 ' | ' 5 ' | ' 6 ' | ' 7 ' | ' 8 ' | ' 9 ' .-}
+    , IntegerLiteral <$> (lexeme pInteger)
+
+      -- digits ' . ' [ digits ] [ ' e ' [ sign ] digits ]
+    , RealLiteral <$> (lexeme pScientific)
+
+    , LStringLiteral <$> (lexeme pStringLiteral)
+    ]
+
+-- digits ' . ' [ digits ] [ ' e ' [ sign ] digits ]
+pScientific :: Parser Scientific
+pScientific = do
+  c <- pInteger
+  void $ string "."
+  f <- many' pDigit
+  e <- do
+    void $ string "e"
+    sign <- optional $ pSign
+    e <- pInteger
+    case sign of
+      Just "-" -> return $ negate e
+      Just "+" -> return          e
+      Nothing  -> return          e
+      _        -> error "pScientific: pSign returned something unexpected"
+    <|> pure 0
+
+  -- Data.Scientific.Scientific constructor expects two arguments: integer
+  -- conefficient and integer exponent. But what we have at the moment is
+  -- floating-point coefficient, represented as integral part `c` and
+  -- floating-point part `f`. `c` is held in `Integer`, and `f` is just a list
+  -- of digits (each represented by an `Int`).
+  --
+  -- We're going to:
+  -- - let `p` be the number of digits in `f`;
+  -- - let `f'` be `f` converted into `Integer`;
+  -- - let `c'` be `c * 10^p + f'`;
+  -- - let `e'` be `e + p`.
+  --
+  -- We can now use `c'` and `e'` as parameters for Scientific type constructor.
+  let p  = fromIntegral $ length f
+  let f' = digitsToInteger f
+  let c' = c * 10^p + f'
+  let e' = e + p
+
+  -- Actually, we need to hop through one more loop. Data.Scientific.Scientific
+  -- uses `Int` for exponent, but the one we just computed is `Integer`. Let's
+  -- do a quick conversion.
+
+  let e'' =
+        if e' > fromIntegral (maxBound :: Int)
+          then fromInteger e'
+          else error "pScientific: can't represent parsed number as \
+                     \Data.Scientific.Scientific"
+
+  return $ scientific c' e''
+
+  where
+    pSign = string "-" <|> string "+"
+
+-- attribute_ref | constant_factor | function_call | general_ref | population .
+pQualifiableFactor :: Parser QualifiableFactor
+pQualifiableFactor =
+  lexeme $ choice [
+      QFAttributeRef <$> (lexeme pAttributeRef)
+
+      -- constant_factor:
+      -- built_in_constant | constant_ref .
+    , QFBuiltInConstant <$> (lexeme pBuiltInConstant)
+    , QFConstantRef <$> (lexeme pConstantRef)
+
+    , QFFunctionCall <$> (lexeme pFunctionCall)
+
+    , QFGeneralRef <$> (lexeme pGeneralRef)
+
+    , QFPopulation <$> (lexeme pPopulation)
+    ]
+
+-- attribute_qualifier | group_qualifier | index_qualifier .
+pQualifier :: Parser Qualifier
+pQualifier =
+  lexeme $ choice [
+      -- ' . ' attribute_ref .
+      AttributeQualifier <$> (keyword "." *> lexeme pAttributeRef)
+
+      -- ' \ ' entity_ref .
+    , GroupQualifier <$> (keyword "\\" *> lexeme pEntityRef)
+
+      -- ' [ ' index_1 [ ' : ' index_2 ] ' ] ' .
+    , IndexQualifier <$>
+        (keyword "[" *> lexeme pIndex1) <*>
+        ((optional $ keyword ":" *> lexeme pIndex2) <* keyword "]")
+    ]
+
+-- numeric_expression .
+pRepetition :: Parser NumericExpression
+pRepetition = pNumericExpression
+
+-- ' 0 ' | ' 1 ' .
+pBit :: Parser Bit
+pBit =
+  lexeme $ choice [
+      keyword "0" *> pure Zero
+    , keyword "1" *> pure One
+    ]
+
+-- FALSE | TRUE | UNKNOWN .
+pLogicalLiteral :: Parser LogicalLiteral
+pLogicalLiteral =
+  lexeme $ choice [
+      keyword1 "FALSE"   *> pure FALSE
+    , keyword1 "TRUE"    *> pure TRUE
+    , keyword1 "UNKNOWN" *> pure UNKNOWN
+    ]
+
+-- CONST_E | PI | SELF | ' ? ' .
+pBuiltInConstant :: Parser BuiltInConstant
+pBuiltInConstant =
+  lexeme $ choice [
+      keyword1 "CONST_E" *> pure CONST_E
+    , keyword1 "PI"      *> pure PI
+    , keyword1 "SELF"    *> pure SELF
+    , keyword1 "?"       *> pure QuestionMark
+    ]
+
+-- constant_id .
+pConstantRef :: Parser ConstantRef
+pConstantRef = lexeme pConstantId
+
+-- ( built_in_function | function_ref ) [ actual_parameter_list ] .
+pFunctionCall :: Parser FunctionCall
+pFunctionCall =
+  FunctionCall <$>
+    (lexeme $ eitherP pBuiltInFunction pFunctionRef) <*>
+    (optional $ lexeme pActualParameterList)
+
+-- ABS | ACOS | ASIN | ATAN | BLENGTH | COS | EXISTS | EXP | FORMAT | HIBOUND | HIINDEX | LENGTH | LOBOUND | LOINDEX | LOG | LOG2 | LOG10 | NVL | ODD | ROLESOF | SIN | SIZEOF | SQRT | TAN | TYPEOF | USEDIN | VALUE | VALUE_IN | VALUE_UNIQUE .
+pBuiltInFunction :: Parser BuiltInFunction
+pBuiltInFunction =
+      (keyword1 "ABS" *> pure ABS)
+  <|> (keyword1 "ACOS" *> pure ACOS)
+  <|> (keyword1 "ASIN" *> pure ASIN)
+  <|> (keyword1 "ATAN" *> pure ATAN)
+  <|> (keyword1 "BLENGTH" *> pure BLENGTH)
+  <|> (keyword1 "COS" *> pure COS)
+  <|> (keyword1 "EXISTS" *> pure EXISTS)
+  <|> (keyword1 "EXP" *> pure EXP)
+  <|> (keyword1 "FORMAT" *> pure FORMAT)
+  <|> (keyword1 "HIBOUND" *> pure HIBOUND)
+  <|> (keyword1 "HIINDEX" *> pure HIINDEX)
+  <|> (keyword1 "LENGTH" *> pure LENGTH)
+  <|> (keyword1 "LOBOUND" *> pure LOBOUND)
+  <|> (keyword1 "LOINDEX" *> pure LOINDEX)
+  <|> (keyword1 "LOG" *> pure LOG)
+  <|> (keyword1 "LOG2" *> pure LOG2)
+  <|> (keyword1 "LOG10" *> pure LOG10)
+  <|> (keyword1 "NVL" *> pure NVL)
+  <|> (keyword1 "ODD" *> pure ODD)
+  <|> (keyword1 "ROLESOF" *> pure ROLESOF)
+  <|> (keyword1 "SIN" *> pure SIN)
+  <|> (keyword1 "SIZEOF" *> pure SIZEOF)
+  <|> (keyword1 "SQRT" *> pure SQRT)
+  <|> (keyword1 "TAN" *> pure TAN)
+  <|> (keyword1 "TYPEOF" *> pure TYPEOF)
+  <|> (keyword1 "USEDIN" *> pure USEDIN)
+  <|> (keyword1 "VALUE" *> pure VALUE)
+  <|> (keyword1 "VALUE_IN" *> pure VALUE_IN)
+  <|> (keyword1 "VALUE_UNIQUE" *> pure VALUE_UNIQUE)
+
+-- function_id .
+pFunctionRef :: Parser FunctionRef
+pFunctionRef = lexeme pFunctionId
+
+-- simple_id .
+pFunctionId :: Parser FunctionId
+pFunctionId = lexeme pSimpleId
+
+-- ' ( ' parameter { ' , ' parameter } ' ) ' .
+pActualParameterList :: Parser ActualParameterList
+pActualParameterList =
+  ActualParameterList <$> (parens $ (lexeme pParameter) `sepBy1` commaSep)
+
+-- expression .
+pParameter :: Parser Parameter
+pParameter = lexeme pExpression
+
+-- parameter_ref | variable_ref .
+--
+-- It's all SimpleId in the end
+pGeneralRef :: Parser GeneralRef
+pGeneralRef = lexeme pSimpleId
+
+-- entity_ref .
+pPopulation :: Parser Population
+pPopulation = lexeme pEntityRef
+
+-- attribute_id .
+pAttributeRef :: Parser AttributeRef
+pAttributeRef = lexeme pAttributeId
+
+-- simple_id .
+pAttributeId :: Parser AttributeId
+pAttributeId = lexeme pSimpleId
+
+-- index .
+pIndex1 :: Parser Index1
+pIndex1 = lexeme pIndex
+
+-- index .
+pIndex2 :: Parser Index2
+pIndex2 = lexeme pIndex
+
+-- numeric_expression .
+pIndex :: Parser NumericExpression
+pIndex = lexeme pNumericExpression

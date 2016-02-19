@@ -41,7 +41,7 @@ createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
             Schema
               (T.pack "design")
               Nothing
-              (SchemaBody Nothing)])
+              (SchemaBody Nothing Nothing)])
 
     it "should parse schema with version id" $
       withFile "test/data/version_id.exp" ReadMode $ \h -> do
@@ -52,7 +52,7 @@ createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
             Schema
               (T.pack "design")
               (Just $ T.pack "{ISO standard 10303 part(41) object(1)\n\tversion(9)}")
-              (SchemaBody Nothing)])
+              (SchemaBody Nothing Nothing)])
 
     it "should parse USE clause" $
       withFile "test/data/use_clause.exp" ReadMode $ \h -> do
@@ -70,7 +70,8 @@ createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
                     (Just [
                       NamedTypeOrRename
                         (T.pack "e1")
-                        (Just (Left $ T.pack "e2"))])]))])
+                        (Just (Left $ T.pack "e2"))])])
+                Nothing)])
 
     it "should parse REFERENCE clause" $
       withFile "test/data/reference_clause.exp" ReadMode $ \h -> do
@@ -88,4 +89,5 @@ createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
                     (Just [
                       ResourceOrRename
                         (T.pack "e2")
-                        (Just $ T.pack "e20")])]))])
+                        (Just $ T.pack "e20")])])
+                Nothing)])
