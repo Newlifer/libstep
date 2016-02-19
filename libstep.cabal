@@ -11,7 +11,7 @@ license:             MIT
 license-file:        LICENSE
 author:              Alex Novozhilov
 maintainer:          Alex Novozhilov, Alexander Batischev <eual.jp@gmail.com>
-copyright:           2015 Alex Novozhilov, Alexander Batischev
+copyright:           2015-2016 Alex Novozhilov, Alexander Batischev
 category:            File
 build-type:          Simple
 -- extra-source-files:
