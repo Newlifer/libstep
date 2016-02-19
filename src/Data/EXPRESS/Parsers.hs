@@ -134,12 +134,9 @@ pSchemaBody = do
 -- letter { letter | digit | ' _ ' } .
 pSimpleId :: Parser SimpleId
 pSimpleId = do
-  start <- takeWhile isLetter
-  if BS.null start
-    then return $ T.empty
-    else do
-      rest <- takeWhile (\x -> isLetter x || isDigit x || isUnderscore x)
-      return $ TE.decodeUtf8 (start `BS.append` rest)
+  start <- takeWhile1 isLetter
+  rest <- takeWhile (\x -> isLetter x || isDigit x || isUnderscore x)
+  return $ TE.decodeUtf8 (start `BS.append` rest)
 
   where
   isUnderscore :: Word8 -> Bool
