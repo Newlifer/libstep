@@ -91,3 +91,13 @@ createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
                         (T.pack "e2")
                         (Just $ T.pack "e20")])])
                 Nothing)])
+
+    it "should parse single digits" $
+      shouldParse
+        (C8.pack "1" ~> pInteger)
+        (1 :: Integer)
+
+    it "should parse digit sequences" $
+      shouldParse
+        (C8.pack "1234567890" ~> pInteger)
+        (1234567890 :: Integer)
