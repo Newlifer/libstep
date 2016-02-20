@@ -104,12 +104,6 @@ isWhitespace x = x == 0x20 -- space
 skipWhitespace :: Parser ()
 skipWhitespace = skipWhile isWhitespace
 
--- ^ Skip one or more whitespace characters
-skipWhitespace1 :: Parser ()
-skipWhitespace1 = do
-  skip isWhitespace
-  skipWhitespace
-
 -- SCHEMA schema_id [ schema_version_id ] ' ; ' schema_body END_SCHEMA ' ; ' .
 pSchema :: Parser Schema
 pSchema =
