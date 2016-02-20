@@ -111,3 +111,12 @@ createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
       shouldParse
         (C8.pack "\"00000061000000620000003f00000061\"" ~> pStringLiteral)
         (T.pack "ab?a")
+
+    it "should parse simple `CONSTANT' block" $
+      shouldParse
+        (C8.pack "CONSTANT a : BOOLEAN := TRUE; END_CONSTANT;" ~> pConstantDecl)
+        (ConstantDecl [
+          ConstantBody
+            (T.pack "a")
+            BooleanType
+            (ESimple $ SETerm $ TFactor $ FSimpleFactor $ UnaryOppedSF Nothing (Right $ PLiteral $ LLogicalLiteral TRUE))])
