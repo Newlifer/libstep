@@ -1062,7 +1062,9 @@ type PrecisionSpec = NumericExpression
 -- named_types [ AS ( entity_id | type_id ) ] .
 data NamedTypeOrRename = NamedTypeOrRename {
   ntorNamedTypes :: NamedTypes
-, ntorAs         :: Maybe (Either EntityId TypeId)
+  -- in the end, both `entity_id` and `type_id` are `simple_id`s, mapping into
+  -- `SingleId` type, so we aren't going to distinguish them here either
+, ntorAs         :: Maybe SimpleId
 }
   deriving (Eq, Show)
 

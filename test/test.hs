@@ -70,7 +70,7 @@ createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
                     (Just [
                       NamedTypeOrRename
                         (T.pack "e1")
-                        (Just (Left $ T.pack "e2"))])])
+                        (Just $ T.pack "e2")])])
                 Nothing)])
 
     it "should parse REFERENCE clause" $

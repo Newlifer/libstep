@@ -296,7 +296,7 @@ pNamedTypeOrRename :: Parser NamedTypeOrRename
 pNamedTypeOrRename =
   NamedTypeOrRename <$>
     (lexeme pNamedTypes) <*>
-    (optional $ asSep *> (lexeme $ eitherP pEntityId pTypeId))
+    (optional $ asSep *> (lexeme pSimpleId))
 
 -- entity_ref | type_ref .
 --
