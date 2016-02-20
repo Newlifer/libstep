@@ -119,4 +119,10 @@ createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
           ConstantBody
             (T.pack "a")
             BooleanType
-            (ESimple $ SETerm $ TFactor $ FSimpleFactor $ UnaryOppedSF Nothing (Right $ PLiteral $ LLogicalLiteral TRUE))])
+            (ESimple $
+              SETerm $
+                TFactor $
+                  FSimpleFactor $
+                    UnaryOppedSF
+                      Nothing
+                      (Right $ PLiteral $ LLogicalLiteral TRUE))])
