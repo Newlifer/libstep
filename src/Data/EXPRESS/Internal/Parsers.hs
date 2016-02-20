@@ -368,8 +368,8 @@ pExpressionOp =
 pSimpleExpression :: Parser SimpleExpression
 pSimpleExpression =
   lexeme $ choice [
-      pSimpleExpressionTerm
-    , pSimpleExpressionAddLikeOp
+      pSimpleExpressionAddLikeOp
+    , pSimpleExpressionTerm
     ]
 
 pSimpleExpressionTerm :: Parser SimpleExpression
@@ -396,7 +396,7 @@ pRelOpExtended =
     , keyword "="     *> pure ROE
     , keyword ":<>:"  *> pure ROWNE
     , keyword ":=:"   *> pure ROWE
-    , keyword "IN"    *> pure OpIN
+    , keyword1 "IN"   *> pure OpIN
     , keyword1 "LIKE" *> pure OpLIKE
     ]
 
@@ -489,18 +489,18 @@ pSetType = do
 
 -- factor { multiplication_like_op factor } .
 pTerm :: Parser Term
-pTerm = TFactor <$> (lexeme pFactor)
-    <|> TMultiplicationLikeOp <$>
+pTerm = TMultiplicationLikeOp <$>
           (lexeme pFactor) <*>
           (lexeme pMultiplicationLikeOp) <*>
           (lexeme pFactor)
+    <|> TFactor <$> (lexeme pFactor)
 
 -- ' + ' | ' - ' | OR | XOR .
 pAddLikeOp :: Parser AddLikeOp
 pAddLikeOp =
   lexeme $ choice [
-      keyword1 "+"   *> pure Plus
-    , keyword1 "-"   *> pure Minus
+      keyword  "+"   *> pure Plus
+    , keyword  "-"   *> pure Minus
     , keyword1 "OR"  *> pure OR
     , keyword1 "XOR" *> pure XOR
     ]

@@ -129,3 +129,15 @@ createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
                     UnaryOppedSF
                       Nothing
                       (Right $ PLiteral $ LLogicalLiteral TRUE))])
+
+    it "should parse 2+2" $
+      shouldParse
+        (C8.pack "2+2" ~> (pSimpleExpression <* endOfInput))
+        (SEAddLikeOp
+          (TFactor $
+            FSimpleFactor $
+              UnaryOppedSF Nothing (Right (PLiteral (IntegerLiteral 2))))
+          Plus
+          (TFactor $
+            FSimpleFactor $
+              UnaryOppedSF Nothing (Right (PLiteral (IntegerLiteral 2)))))
