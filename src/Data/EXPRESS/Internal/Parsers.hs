@@ -71,7 +71,14 @@ keyword k = do
 keyword1 :: BS.ByteString -> Parser ()
 keyword1 k = do
   _ <- string k <?> (T.unpack $ TE.decodeUtf8 k) ++ " expected"
-  skipWhitespace1
+  -- ensure that the keyword is not followed by a letter or a digit
+  next <- peekWord8
+  case next of
+    Nothing -> skipWhitespace
+    Just x  ->
+      if inClass ";, \n\r\t" x
+        then skipWhitespace
+        else fail "any of `;, \\n\\r\\t' expected after keyword"
 
 lexeme :: Parser a -> Parser a
 lexeme p = p <* skipWhitespace
