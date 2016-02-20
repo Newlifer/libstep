@@ -31,7 +31,7 @@ listToMaybe [] = Nothing
 listToMaybe xs = Just xs
 
 digitsToInteger :: [Int] -> Integer
-digitsToInteger [] = 0
+digitsToInteger [] = error "digitsToInteger got called on empty list"
 digitsToInteger [i] = fromIntegral i
 digitsToInteger (start:rest) =
   foldl'
