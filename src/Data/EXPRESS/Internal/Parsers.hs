@@ -187,7 +187,7 @@ pStringLiteral = choice [pSimpleStringLiteral, pEncodedStringLiteral]
     pQQ = do
       void $ word8 apostrophe
       void $ word8 apostrophe
-      return $ BS.pack [apostrophe, apostrophe]
+      return $ BS.singleton apostrophe
 
     pNotQuote :: Parser BS.ByteString
     pNotQuote = takeWhile1 okay

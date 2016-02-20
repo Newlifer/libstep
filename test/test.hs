@@ -101,3 +101,8 @@ createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
       shouldParse
         (C8.pack "1234567890" ~> pInteger)
         (1234567890 :: Integer)
+
+    it "should parse simple string literals" $
+      shouldParse
+        (C8.pack "'It''s just a test'" ~> pStringLiteral)
+        (T.pack "It's just a test")
