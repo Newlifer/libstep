@@ -2,6 +2,7 @@ import Test.Hspec.Attoparsec
 import Test.Tasty
 import Test.Tasty.Hspec
 
+import Data.Attoparsec.ByteString (endOfInput)
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.Text as T
 
@@ -22,11 +23,12 @@ createStepParsersSpecs :: IO TestTree
 createStepParsersSpecs = testSpec "Parsing STEP" $ parallel $
   describe "success cases" $ do
     it "should parse case #1" $
-      (C8.pack "(  1.45  , 666.    ,2.   ,6.022E23)") ~> parseStep
+      (C8.pack "(  1.45  , 666.    ,2.   ,6.022E23)")
+        ~> (parseStep <* endOfInput)
         `shouldParse` (Vector [1.45, 666.0, 2.0, 6.022e23])
 
     it "should parse case #2" $
-      (C8.pack "(1.0,2.0,3.0,4.0)") ~> parseStep
+      (C8.pack "(1.0,2.0,3.0,4.0)") ~> (parseStep <* endOfInput)
         `shouldParse` (Vector [1.0, 2.0, 3.0, 4.0])
 
 createExpressParsersSpecs :: IO TestTree
@@ -36,7 +38,7 @@ createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
       withFile "test/data/empty.exp" ReadMode $ \h -> do
         schema <- C8.hGetContents h
         shouldParse
-          (schema ~> pExpress)
+          (schema ~> (pExpress <* endOfInput))
           (Express [
             Schema
               (T.pack "design")
@@ -47,18 +49,19 @@ createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
       withFile "test/data/version_id.exp" ReadMode $ \h -> do
         schema <- C8.hGetContents h
         shouldParse
-          (schema ~> pExpress)
+          (schema ~> (pExpress <* endOfInput))
           (Express [
             Schema
               (T.pack "design")
-              (Just $ T.pack "{ISO standard 10303 part(41) object(1)\n\tversion(9)}")
+              (Just $ T.pack "{ISO standard 10303 part(41) object(1)\
+                             \\n\tversion(9)}")
               (SchemaBody Nothing Nothing)])
 
     it "should parse USE clause" $
       withFile "test/data/use_clause.exp" ReadMode $ \h -> do
         schema <- C8.hGetContents h
         shouldParse
-          (schema ~> pExpress)
+          (schema ~> (pExpress <* endOfInput))
           (Express [
             Schema
               (T.pack "s1")
@@ -77,7 +80,7 @@ createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
       withFile "test/data/reference_clause.exp" ReadMode $ \h -> do
         schema <- C8.hGetContents h
         shouldParse
-          (schema ~> pExpress)
+          (schema ~> (pExpress <* endOfInput))
           (Express [
             Schema
               (T.pack "s2")
@@ -94,28 +97,28 @@ createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
 
     it "should parse single digits" $
       shouldParse
-        (C8.pack "1" ~> pInteger)
+        (C8.pack "1" ~> (pInteger <* endOfInput))
         (1 :: Integer)
 
     it "should parse digit sequences" $
       shouldParse
-        (C8.pack "1234567890" ~> pInteger)
+        (C8.pack "1234567890" ~> (pInteger <* endOfInput))
         (1234567890 :: Integer)
 
     it "should parse simple string literals" $
       shouldParse
-        (C8.pack "'It''s just a test'" ~> pStringLiteral)
+        (C8.pack "'It''s just a test'" ~> (pStringLiteral <* endOfInput))
         (T.pack "It's just a test")
 
     it "should parse encoded string literals" $
-      shouldParse
-        (C8.pack "\"00000061000000620000003f00000061\"" ~> pStringLiteral)
-        (T.pack "ab?a")
+      (C8.pack "\"00000061000000620000003f00000061\""
+        ~> (pStringLiteral <* endOfInput))
+        `shouldParse` (T.pack "ab?a")
 
     it "should parse simple `CONSTANT' block" $
-      shouldParse
-        (C8.pack "CONSTANT a : BOOLEAN := TRUE; END_CONSTANT;" ~> pConstantDecl)
-        (ConstantDecl [
+      (C8.pack "CONSTANT a : BOOLEAN := TRUE; END_CONSTANT;"
+        ~> (pConstantDecl <* endOfInput))
+        `shouldParse` (ConstantDecl [
           ConstantBody
             (T.pack "a")
             BooleanType
