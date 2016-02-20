@@ -220,7 +220,7 @@ pStringLiteral = choice [pSimpleStringLiteral, pEncodedStringLiteral]
     return $ T.concat str
     where
     quote :: Word8
-    quote = 0x34
+    quote = 0x22
 
     {-
     encoded_character = octet octet octet octet .
@@ -239,8 +239,8 @@ pStringLiteral = choice [pSimpleStringLiteral, pEncodedStringLiteral]
       return $ (wordToNum high) * 16 + (wordToNum low)
       where
       wordToNum x = if (x >= 0x30 && x <= 0x39)
-                      then x - 0x30 -- digit
-                      else x - 0x61 -- letter
+                      then x - 0x30      -- digit
+                      else 10 + x - 0x61 -- letter
 
     pHexDigit :: Parser Word8
     pHexDigit = satisfy (\x -> (isDigit x) || (x >= 0x61 && x <= 0x66)) <?> "hex digit"
