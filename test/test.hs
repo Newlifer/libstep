@@ -175,3 +175,31 @@ createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
             (ELiteral $ IntegerLiteral 10)
             (ELiteral $ IntegerLiteral 20))
           (ELiteral $ IntegerLiteral 3))
+
+    it "should parse empty aggregate initializer" $
+      shouldParse
+        (C8.pack "[]" ~> (pExpression <* endOfInput))
+        (AggregateInitializer Nothing)
+
+    it "should parse non-empty aggregate initializer" $
+      shouldParse
+        (C8.pack "[1, 3, 6, 9*8, -12]" ~> (pExpression <* endOfInput))
+        (AggregateInitializer $ Just
+          [ Element (ELiteral (IntegerLiteral 1)) Nothing
+          , Element (ELiteral (IntegerLiteral 3)) Nothing
+          , Element (ELiteral (IntegerLiteral 6)) Nothing
+          , Element
+              (Multiply
+                (ELiteral (IntegerLiteral 9))
+                (ELiteral (IntegerLiteral 8)))
+              Nothing
+          , Element (Negate (ELiteral (IntegerLiteral 12))) Nothing])
+
+    it "should parse aggregate initializer with repetitions" $
+      shouldParse
+        (C8.pack "[ TRUE : 5]" ~> (pExpression <* endOfInput))
+        (AggregateInitializer
+          (Just [
+            Element
+              (ELiteral (LLogicalLiteral TRUE))
+              (Just $ ELiteral $ IntegerLiteral 5)]))
