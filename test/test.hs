@@ -122,32 +122,56 @@ createExpressParsersSpecs = testSpec "Parsing EXPRESS" $ parallel $
           ConstantBody
             (T.pack "a")
             BooleanType
-            (ESimple $
-              SETerm $
-                TFactor $
-                  FSimpleFactor $
-                    UnaryOppedSF
-                      Nothing
-                      (Right $ PLiteral $ LLogicalLiteral TRUE))])
+            (ELiteral $ LLogicalLiteral TRUE)])
 
     it "should parse 2+2" $
       shouldParse
-        (C8.pack "2+2" ~> (pSimpleExpressionAddLikeOp <* endOfInput))
-        (SEAddLikeOp
-          (TFactor $
-            FSimpleFactor $
-              UnaryOppedSF Nothing (Right (PLiteral (IntegerLiteral 2))))
-          Plus
-          (TFactor $
-            FSimpleFactor $
-              UnaryOppedSF Nothing (Right (PLiteral (IntegerLiteral 2)))))
+        (C8.pack "2+2" ~> (pExpression <* endOfInput))
+        (Add
+          (ELiteral (IntegerLiteral 2))
+          (ELiteral (IntegerLiteral 2)))
 
     it "should parse 2*2" $
       shouldParse
-        (C8.pack "2*2" ~> (pTerm <* endOfInput))
-        (TMultiplicationLikeOp
-          (FSimpleFactor $
-            UnaryOppedSF Nothing (Right (PLiteral (IntegerLiteral 2))))
-          Times
-          (FSimpleFactor $
-            UnaryOppedSF Nothing (Right (PLiteral (IntegerLiteral 2)))))
+        (C8.pack "2*2" ~> (pExpression <* endOfInput))
+        (Multiply
+          (ELiteral (IntegerLiteral 2))
+          (ELiteral (IntegerLiteral 2)))
+
+    it "should parse 2*2+2/2-5" $
+      shouldParse
+        (C8.pack "2*2+2/2-5" ~> (pExpression <* endOfInput))
+        (Subtract
+          (Add
+            (Multiply
+              (ELiteral (IntegerLiteral 2))
+              (ELiteral (IntegerLiteral 2)))
+            (Divide
+              (ELiteral (IntegerLiteral 2))
+              (ELiteral (IntegerLiteral 2))))
+          (ELiteral (IntegerLiteral 5)))
+
+    it "should parse -10**2" $
+      shouldParse
+        (C8.pack "-10**2" ~> (pExpression <* endOfInput))
+        (Pow
+          (Negate $ ELiteral $ IntegerLiteral 10)
+          (ELiteral $ IntegerLiteral 2))
+
+    it "should parse 10/20*30" $
+      shouldParse
+        (C8.pack "10/20*30" ~> (pExpression <* endOfInput))
+        (Multiply
+          (Divide
+            (ELiteral $ IntegerLiteral 10)
+            (ELiteral $ IntegerLiteral 20))
+          (ELiteral $ IntegerLiteral 30))
+
+    it "should parse (10+20) DIV 3" $
+      shouldParse
+        (C8.pack "(10+20) DIV 3" ~> (pExpression <* endOfInput))
+        (Div
+          (Add
+            (ELiteral $ IntegerLiteral 10)
+            (ELiteral $ IntegerLiteral 20))
+          (ELiteral $ IntegerLiteral 3))

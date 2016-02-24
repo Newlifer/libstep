@@ -177,10 +177,58 @@ data EXPRESSType =
     }
   deriving (Eq, Show)
 
--- simple_expression [ rel_op_extended simple_expression ] .
-data Expression where
-  ESimple :: SimpleExpression -> Expression
-  EOp :: SimpleExpression -> RelOpExtended -> SimpleExpression -> Expression
+data Expression = ELiteral         Literal
+                  -- ' [ ' [ element { ' , ' element } ] ' ] ' .
+                | AggregateInitializer {
+                    aiElements :: Maybe [Element]
+                  }
+                  -- entity_ref ' ( ' [ expression { ' , ' expression } ] ' ) ' .
+                | EntityConstructor {
+                    ecEntityRef   :: EXPRESSType
+                  , ecExpressions :: Maybe [Expression]
+                  }
+                  -- [ type_ref ' . ' ] enumeration_ref .
+                | EnumerationReference {
+                    erTypeRef        :: Maybe EXPRESSType
+                  , erEnumerationRef :: EnumerationRef
+                  }
+                  -- ' { ' interval_low interval_op interval_item interval_op interval_high ' } ' .
+                | Interval {
+                    intervalLow  :: IntervalLow
+                  , intervalOp   :: IntervalOp
+                  , intervalItem :: IntervalItem
+                  , intervalOp2  :: IntervalOp
+                  , intervalHigh :: IntervalHigh
+                  }
+                  -- QUERY ' ( ' variable_id ' <* ' aggregate_source ' | ' logical_expression ' ) ' .
+                | QueryExpression {
+                    qeVariableId        :: VariableId
+                  , qeAggregateSource   :: AggregateSource
+                  , qeLogicalExpression :: LogicalExpression
+                  }
+                | Negate           Expression
+                | Not              Expression
+                | Add              Expression  Expression
+                | Subtract         Expression  Expression
+                | Multiply         Expression  Expression
+                | Divide           Expression  Expression
+                | Pow              Expression  Expression
+                | Div              Expression  Expression
+                | Mod              Expression  Expression
+                | And              Expression  Expression
+                | Or               Expression  Expression
+                | Compose          Expression  Expression
+                | Xor              Expression  Expression
+                | Equals           Expression  Expression
+                | NotEquals        Expression  Expression
+                | LessOrEquals     Expression  Expression
+                | GreaterOrEquals  Expression  Expression
+                | Less             Expression  Expression
+                | Greater          Expression  Expression
+                | WeirdEquals      Expression  Expression
+                | WeirdNotEquals   Expression  Expression
+                | In               Expression  Expression
+                | Like             Expression  Expression
   deriving (Eq, Show)
 
 -- entity_decl | function_decl | procedure_decl | subtype_constraint_decl | type_decl .
@@ -372,85 +420,7 @@ type Bound1 = NumericExpression
 type Bound2 = NumericExpression
 
 -- simple_expression .
-type NumericExpression = SimpleExpression
-
--- term { add_like_op term } .
-data SimpleExpression where
-  SETerm :: Term -> SimpleExpression
-  SEAddLikeOp :: Term -> AddLikeOp -> Term -> SimpleExpression
-  deriving (Eq, Show)
-
--- factor { multiplication_like_op factor } .
-data Term where
-  TFactor :: Factor -> Term
-  TMultiplicationLikeOp :: Factor -> MultiplicationLikeOp -> Factor -> Term
-  deriving (Eq, Show)
-
--- simple_factor [ ' ** ' simple_factor ] .
-data Factor where
-  FSimpleFactor :: SimpleFactor -> Factor
-  FSPow :: SimpleFactor -> SimpleFactor -> Factor
-  deriving (Eq, Show)
-
--- aggregate_initializer | entity_constructor | enumeration_reference | interval | query_expression | ( [ unary_op ] ( ' ( ' expression ' ) ' | primary ) ) .
-data SimpleFactor =
-    -- ' [ ' [ element { ' , ' element } ] ' ] ' .
-    AggregateInitializer {
-      aiElements :: Maybe [Element]
-    }
-    -- entity_ref ' ( ' [ expression { ' , ' expression } ] ' ) ' .
-  | EntityConstructor {
-      ecEntityRef   :: EXPRESSType
-    , ecExpressions :: Maybe [Expression]
-    }
-    -- [ type_ref ' . ' ] enumeration_ref .
-  | EnumerationReference {
-      erTypeRef        :: Maybe EXPRESSType
-    , erEnumerationRef :: EnumerationRef
-    }
-    -- ' { ' interval_low interval_op interval_item interval_op interval_high ' } ' .
-  | Interval {
-      intervalLow  :: IntervalLow
-    , intervalOp   :: IntervalOp
-    , intervalItem :: IntervalItem
-    , intervalOp2  :: IntervalOp
-    , intervalHigh :: IntervalHigh
-    }
-    -- QUERY ' ( ' variable_id ' <* ' aggregate_source ' | ' logical_expression ' ) ' .
-  | QueryExpression {
-      qeVariableId        :: VariableId
-    , qeAggregateSource   :: AggregateSource
-    , qeLogicalExpression :: LogicalExpression
-    }
-  | UnaryOppedSF {
-      uosfUnaryOp :: Maybe UnaryOp
-    , uosfBody    :: Either Expression Primary
-    }
-  deriving (Eq, Show)
-
--- literal | ( qualifiable_factor { qualifier } ) .
-data Primary where
-  PLiteral :: Literal -> Primary
-  PQualifiableFactorWithQualifiers ::
-      QualifiableFactor -> Maybe [Qualifier] -> Primary
-  deriving (Eq, Show)
-
--- attribute_qualifier | group_qualifier | index_qualifier .
-data Qualifier =
-    -- ' . ' attribute_ref .
-    AttributeQualifier {
-      aqAttributeRef :: AttributeRef
-    }
-    -- ' \ ' entity_ref .
-  | GroupQualifier {
-      gqEntityRef :: EXPRESSType
-    }
-    -- ' [ ' index_1 [ ' : ' index_2 ] ' ] ' .
-  | IndexQualifier {
-      iqIndex1 :: Index1
-    , iqIndex2 :: Maybe Index2
-    }
-  deriving (Eq, Show)
+type NumericExpression = Expression
 
 -- attribute_id .
 type AttributeRef = AttributeId
@@ -466,31 +436,6 @@ type Index2 = Index
 
 -- numeric_expression .
 type Index = NumericExpression
-
--- attribute_ref | constant_factor | function_call | general_ref | population .
-data QualifiableFactor =
-    -- attribute_ref
-    QFAttributeRef {
-      qfAttributeRef :: AttributeRef
-    }
-    -- constant_factor:
-    -- built_in_constant | constant_ref .
-  | QFBuiltInConstant {
-      qfBuiltInConstant :: BuiltInConstant
-    }
-  | QFConstantRef {
-      qfConstantRef :: ConstantRef
-    }
-  | QFFunctionCall {
-      qfFunctionCall :: FunctionCall
-    }
-  | QFGeneralRef {
-      qfGeneralRef :: GeneralRef
-    }
-  | QFPopulation {
-      qfPopulation :: Population
-    }
-  deriving (Eq, Show)
 
 -- ( built_in_function | function_ref ) [ actual_parameter_list ] .
 data FunctionCall = FunctionCall {
@@ -604,21 +549,21 @@ data UnaryOp = UPlus | UMinus | UNOT
 type LogicalExpression = Expression
 
 -- simple_expression .
-type AggregateSource = SimpleExpression
+type AggregateSource = Expression
 
 -- simple_expression .
-type IntervalLow = SimpleExpression
+type IntervalLow = Expression
 
 -- simple_expression .
-type IntervalHigh = SimpleExpression
+type IntervalHigh = Expression
 
 -- simple_expression .
-type IntervalItem = SimpleExpression
+type IntervalItem = Expression
 
 -- ' < ' | ' <= ' .
 data IntervalOp =
-    Less
-  | LessEqual
+    IntervalLess
+  | IntervalLessEqual
   deriving (Eq, Show)
 
 -- enumeration_id .
@@ -636,24 +581,6 @@ data Element = Element {
 
 -- numeric_expression .
 type Repetition = NumericExpression
-
--- ' * ' | ' / ' | DIV | MOD | AND | ' || ' .
-data MultiplicationLikeOp =
-    Times
-  | Divide
-  | DIV
-  | MOD
-  | AND
-  | Or  -- '||'
-  deriving (Eq, Show)
-
--- ' + ' | ' - ' | OR | XOR .
-data AddLikeOp =
-    Plus
-  | Minus
-  | OR
-  | XOR
-  deriving (Eq, Show)
 
 -- attribute_id | redeclared_attribute .
 -- class CAttributeDecl a

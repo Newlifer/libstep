@@ -9,6 +9,7 @@ import Prelude hiding (takeWhile)
 import Control.Applicative ((<|>), optional)
 import Control.Monad (void, liftM)
 import Data.Attoparsec.ByteString
+import Data.Attoparsec.Expr (Assoc(..), Operator(..), buildExpressionParser)
 import Data.List (foldl')
 import Data.Maybe (isJust)
 import Data.Scientific (Scientific(), scientific)
@@ -350,55 +351,104 @@ pAggregationTypes = lexeme $ choice [pArrayType, pBagType, pListType, pSetType]
 pEntityRef :: Parser EXPRESSType
 pEntityRef = EntityRef <$> lexeme pEntityId
 
--- simple_expression [ rel_op_extended simple_expression ] .
+-- | Parse an arithmetic expression.
+--
+-- For this parser, we stopped following WSN, because it doesn't even specify
+-- how "1+2+3" should be parsed. Instead, we're using Data.Attoparsec.Expr to
+-- build a parser according to the textual description from the specification.
 pExpression :: Parser Expression
-pExpression = lexeme $ choice [pExpressionSimple, pExpressionOp]
+pExpression = buildExpressionParser table pTerm
+  where
+  pTerm = -- pSimpleId -- ссылка
+          -- pSimpleId '.' pSimpleId -- префиксная ссылка или ссылка на атрибут
+                                     -- (неразличимы на этапе парсинга)
+          -- pSimpleId '\' pSimpleId -- групповая ссылка
+          -- TODO: implement the above once we grasped the spec better
+          keyword "(" *> (lexeme pExpression) <* keyword ")"
+      <|> ELiteral <$> (lexeme pLiteral)
+      <|> (lexeme pAggregateInitializer)
+      <|> (lexeme pEntityConstructor)
+      <|> (lexeme pEnumerationReference)
+      <|> (lexeme pInterval)
+      <|> (lexeme pQueryExpression)
 
-pExpressionSimple :: Parser Expression
-pExpressionSimple = ESimple <$> lexeme pSimpleExpression
+  -- ' [ ' [ element { ' , ' element } ] ' ] ' .
+  pAggregateInitializer = do
+    keyword "["
+    elements <- optional $ (lexeme pElement) `sepBy1` commaSep
+    keyword "]"
+    return $ AggregateInitializer elements
 
-pExpressionOp :: Parser Expression
-pExpressionOp =
-  EOp <$>
-    (lexeme pSimpleExpression) <*>
-    (lexeme pRelOpExtended) <*>
-    (lexeme pSimpleExpression)
+  -- entity_ref ' ( ' [ expression { ' , ' expression } ] ' ) ' .
+  pEntityConstructor = do
+    eref <- lexeme pEntityRef
+    keyword "("
+    exprs <- optional $ (lexeme pExpression) `sepBy1` commaSep
+    keyword ")"
+    return $ EntityConstructor eref exprs
 
--- term { add_like_op term } .
-pSimpleExpression :: Parser SimpleExpression
-pSimpleExpression =
-  lexeme $ choice [
-      pSimpleExpressionAddLikeOp
-    , pSimpleExpressionTerm
-    ]
+  -- [ type_ref ' . ' ] enumeration_ref .
+  pEnumerationReference =
+    EnumerationReference <$>
+      (optional $ lexeme pTypeRef) <*>
+      (lexeme pEnumerationRef)
 
-pSimpleExpressionTerm :: Parser SimpleExpression
-pSimpleExpressionTerm = SETerm <$> lexeme pTerm
+  -- ' { ' interval_low interval_op interval_item interval_op interval_high ' } ' .
+  pInterval =
+    Interval <$>
+      (keyword "{" *> lexeme pIntervalLow) <*>
+      (lexeme pIntervalOp) <*>
+      (lexeme pIntervalItem) <*>
+      (lexeme pIntervalOp) <*>
+      (lexeme pIntervalHigh <* keyword "}")
 
-pSimpleExpressionAddLikeOp :: Parser SimpleExpression
-pSimpleExpressionAddLikeOp =
-  SEAddLikeOp <$>
-    lexeme pTerm <*>
-    lexeme pAddLikeOp <*>
-    lexeme pTerm
+  -- QUERY ' ( ' variable_id ' <* ' aggregate_source ' | ' logical_expression ' ) ' .
+  pQueryExpression = do
+    keyword1 "QUERY"
+    keyword "("
+    vid <- lexeme pVariableId
+    keyword "<*"
+    source <- pAggregateSource
+    keyword "|"
+    expr <- pLogicalExpression
+    keyword ")"
+    return $ QueryExpression vid source expr
 
--- rel_op | IN | LIKE .
--- and rel_op is:
--- ' < ' | ' > ' | ' <= ' | ' >= ' | ' <> ' | ' = ' | ' :<>: ' | ' := :' .
-pRelOpExtended :: Parser RelOpExtended
-pRelOpExtended =
-  lexeme $ choice [
-      keyword "<"     *> pure ROL
-    , keyword ">"     *> pure ROG
-    , keyword "<="    *> pure ROLE
-    , keyword ">="    *> pure ROGE
-    , keyword "<>"    *> pure RONE
-    , keyword "="     *> pure ROE
-    , keyword ":<>:"  *> pure ROWNE
-    , keyword ":=:"   *> pure ROWE
-    , keyword1 "IN"   *> pure OpIN
-    , keyword1 "LIKE" *> pure OpLIKE
-    ]
+
+  table = [ -- Technically, the highest priority is reserved for links: stuff
+            -- like "a[b]", "a.b", and "a\b". But we incorporated those things
+            -- in terms parser, so we don't need to handle them here
+
+            [ Prefix (keyword   "+"    *> return id              )
+            , Prefix (keyword   "-"    *> return Negate          )
+            , Prefix (keyword1  "NOT"  *> return Not             )
+            ]
+          , [ Infix  (keyword   "**"   *> return Pow             ) AssocLeft
+            ]
+          , [ Infix  (keyword   "*"    *> return Multiply        ) AssocLeft
+            , Infix  (keyword   "/"    *> return Divide          ) AssocLeft
+            , Infix  (keyword1  "DIV"  *> return Div             ) AssocLeft
+            , Infix  (keyword1  "MOD"  *> return Mod             ) AssocLeft
+            , Infix  (keyword1  "AND"  *> return And             ) AssocLeft
+            , Infix  (keyword   "||"   *> return Compose         ) AssocLeft
+            ]
+          , [ Infix  (keyword   "+"    *> return Add             ) AssocLeft
+            , Infix  (keyword   "-"    *> return Subtract        ) AssocLeft
+            , Infix  (keyword1  "OR"   *> return Or              ) AssocLeft
+            , Infix  (keyword1  "XOR"  *> return Xor             ) AssocLeft
+            ]
+          , [ Infix  (keyword   "="    *> return Equals          ) AssocLeft
+            , Infix  (keyword   "<>"   *> return NotEquals       ) AssocLeft
+            , Infix  (keyword   "<="   *> return LessOrEquals    ) AssocLeft
+            , Infix  (keyword   ">="   *> return GreaterOrEquals ) AssocLeft
+            , Infix  (keyword   "<"    *> return Less            ) AssocLeft
+            , Infix  (keyword   ">"    *> return Greater         ) AssocLeft
+            , Infix  (keyword   ":=:"  *> return WeirdEquals     ) AssocLeft
+            , Infix  (keyword   ":<>:" *> return WeirdNotEquals  ) AssocLeft
+            , Infix  (keyword1  "IN"   *> return In              ) AssocLeft
+            , Infix  (keyword1  "LIKE" *> return Like            ) AssocLeft
+            ]
+          ]
 
 -- binary_type | boolean_type | integer_type | logical_type | number_type | real_type | string_type .
 pSimpleTypes :: Parser EXPRESSType
@@ -437,7 +487,7 @@ pSimpleTypes =
   -- ...that translates to...
   -- simple_expression .
   pWidth :: Parser Width
-  pWidth = lexeme pSimpleExpression
+  pWidth = lexeme pExpression
 
   -- REAL [ ' ( ' precision_spec ' ) ' ] .
   pRealType :: Parser EXPRESSType
@@ -487,28 +537,6 @@ pSetType = do
   t <- lexeme pInstantiableType
   return $ SetType bounds t
 
--- factor { multiplication_like_op factor } .
-pTerm :: Parser Term
-pTerm = TMultiplicationLikeOp <$>
-          (lexeme pFactor) <*>
-          (lexeme pMultiplicationLikeOp) <*>
-          (lexeme pFactor)
-    <|> TFactor <$> (lexeme pFactor)
-
--- ' + ' | ' - ' | OR | XOR .
-pAddLikeOp :: Parser AddLikeOp
-pAddLikeOp =
-  lexeme $ choice [
-      keyword  "+"   *> pure Plus
-    , keyword  "-"   *> pure Minus
-    , keyword1 "OR"  *> pure OR
-    , keyword1 "XOR" *> pure XOR
-    ]
-
--- simple_expression .
-pNumericExpression :: Parser NumericExpression
-pNumericExpression = lexeme pSimpleExpression
-
 -- ' [ ' bound_1 ' : ' bound_2 ' ] ' .
 pBoundSpec :: Parser BoundSpec
 pBoundSpec = do
@@ -518,87 +546,6 @@ pBoundSpec = do
   b2 <- lexeme pBound2
   keyword "]"
   return $ BoundSpec b1 b2
-
--- simple_factor [ ' ** ' simple_factor ] .
-pFactor :: Parser Factor
-pFactor = FSimpleFactor <$> (lexeme pSimpleFactor)
-      <|> FSPow <$>
-            (lexeme pSimpleFactor <* keyword "**") <*>
-            (lexeme pSimpleFactor)
-
--- ' * ' | ' / ' | DIV | MOD | AND | ' || ' .
-pMultiplicationLikeOp :: Parser MultiplicationLikeOp
-pMultiplicationLikeOp =
-  lexeme $ choice [
-      keyword  "*"   *> pure Times
-    , keyword  "/"   *> pure Divide
-    , keyword1 "DIV" *> pure DIV
-    , keyword1 "MOD" *> pure MOD
-    , keyword1 "AND" *> pure AND
-    , keyword  "||"  *> pure Or
-    ]
-
--- aggregate_initializer | entity_constructor | enumeration_reference | interval | query_expression | ( [ unary_op ] ( ' ( ' expression ' ) ' | primary ) ) .
-pSimpleFactor :: Parser SimpleFactor
-pSimpleFactor =
-  lexeme $ choice [
-      pAggregateInitializer
-    , pEntityConstructor
-    , pEnumerationReference
-    , pInterval
-    , pQueryExpression
-    , pUnaryOppedSF
-    ]
-  where
-    -- ' [ ' [ element { ' , ' element } ] ' ] ' .
-    pAggregateInitializer = do
-      keyword "["
-      elements <- optional $ (lexeme pElement) `sepBy1` commaSep
-      keyword "]"
-      return $ AggregateInitializer elements
-
-    -- entity_ref ' ( ' [ expression { ' , ' expression } ] ' ) ' .
-    pEntityConstructor = do
-      eref <- lexeme pEntityRef
-      keyword "("
-      exprs <- optional $ (lexeme pExpression) `sepBy1` commaSep
-      keyword ")"
-      return $ EntityConstructor eref exprs
-
-    -- [ type_ref ' . ' ] enumeration_ref .
-    pEnumerationReference =
-      EnumerationReference <$>
-        (optional $ lexeme pTypeRef) <*>
-        (lexeme pEnumerationRef)
-
-    -- ' { ' interval_low interval_op interval_item interval_op interval_high ' } ' .
-    pInterval =
-      Interval <$>
-        (keyword "{" *> lexeme pIntervalLow) <*>
-        (lexeme pIntervalOp) <*>
-        (lexeme pIntervalItem) <*>
-        (lexeme pIntervalOp) <*>
-        (lexeme pIntervalHigh <* keyword "}")
-
-    -- QUERY ' ( ' variable_id ' <* ' aggregate_source ' | ' logical_expression ' ) ' .
-    pQueryExpression = do
-      keyword1 "QUERY"
-      keyword "("
-      vid <- lexeme pVariableId
-      keyword "<*"
-      source <- pAggregateSource
-      keyword "|"
-      expr <- pLogicalExpression
-      keyword ")"
-      return $ QueryExpression vid source expr
-
-    -- [ unary_op ] ( ' ( ' expression ' ) ' | primary ) .
-    pUnaryOppedSF =
-      UnaryOppedSF <$>
-        (optional $ lexeme pUnaryOp) <*>
-        (lexeme $ eitherP
-          (parens $ lexeme pExpression)
-          (lexeme pPrimary))
 
 -- expression [ ' : ' repetition ] .
 pElement :: Parser Element
@@ -617,23 +564,23 @@ pEnumerationId = lexeme pSimpleId
 
 -- simple_expression .
 pIntervalLow :: Parser IntervalLow
-pIntervalLow = lexeme pSimpleExpression
+pIntervalLow = lexeme pExpression
 
 -- ' < ' | ' <= ' .
 pIntervalOp :: Parser IntervalOp
 pIntervalOp =
   lexeme $ choice [
-      keyword "<"  *> pure Less
-    , keyword "<=" *> pure LessEqual
+      keyword "<"  *> pure IntervalLess
+    , keyword "<=" *> pure IntervalLessEqual
     ]
 
 -- simple_expression .
 pIntervalItem :: Parser IntervalItem
-pIntervalItem = lexeme pSimpleExpression
+pIntervalItem = lexeme pExpression
 
 -- simple_expression .
 pIntervalHigh :: Parser IntervalHigh
-pIntervalHigh = lexeme pSimpleExpression
+pIntervalHigh = lexeme pExpression
 
 -- numeric_expression .
 pBound1 :: Parser Bound1
@@ -649,27 +596,11 @@ pVariableId = lexeme pSimpleId
 
 -- simple_expression .
 pAggregateSource :: Parser AggregateSource
-pAggregateSource = pSimpleExpression
+pAggregateSource = pExpression
 
 -- expression .
 pLogicalExpression :: Parser LogicalExpression
 pLogicalExpression = pExpression
-
--- ' + ' | ' - ' | NOT .
-pUnaryOp :: Parser UnaryOp
-pUnaryOp =
-  lexeme $ choice [
-      keyword "+"   *> pure UPlus
-    , keyword "-"   *> pure UMinus
-    , keyword "NOT" *> pure UNOT
-    ]
-
--- literal | ( qualifiable_factor { qualifier } ) .
-pPrimary :: Parser Primary
-pPrimary = PLiteral <$> (lexeme pLiteral)
-       <|> PQualifiableFactorWithQualifiers <$>
-             (lexeme pQualifiableFactor) <*>
-             (optional $ lexeme $ many' pQualifier)
 
 -- binary_literal | logical_literal | real_literal | string_literal .
 pLiteral :: Parser Literal
@@ -743,40 +674,6 @@ pScientific = do
 
   where
     pSign = string "-" <|> string "+"
-
--- attribute_ref | constant_factor | function_call | general_ref | population .
-pQualifiableFactor :: Parser QualifiableFactor
-pQualifiableFactor =
-  lexeme $ choice [
-      QFAttributeRef <$> (lexeme pAttributeRef)
-
-      -- constant_factor:
-      -- built_in_constant | constant_ref .
-    , QFBuiltInConstant <$> (lexeme pBuiltInConstant)
-    , QFConstantRef <$> (lexeme pConstantRef)
-
-    , QFFunctionCall <$> (lexeme pFunctionCall)
-
-    , QFGeneralRef <$> (lexeme pGeneralRef)
-
-    , QFPopulation <$> (lexeme pPopulation)
-    ]
-
--- attribute_qualifier | group_qualifier | index_qualifier .
-pQualifier :: Parser Qualifier
-pQualifier =
-  lexeme $ choice [
-      -- ' . ' attribute_ref .
-      AttributeQualifier <$> (keyword "." *> lexeme pAttributeRef)
-
-      -- ' \ ' entity_ref .
-    , GroupQualifier <$> (keyword "\\" *> lexeme pEntityRef)
-
-      -- ' [ ' index_1 [ ' : ' index_2 ] ' ] ' .
-    , IndexQualifier <$>
-        (keyword "[" *> lexeme pIndex1) <*>
-        ((optional $ keyword ":" *> lexeme pIndex2) <* keyword "]")
-    ]
 
 -- numeric_expression .
 pRepetition :: Parser NumericExpression
@@ -897,5 +794,12 @@ pIndex2 :: Parser Index2
 pIndex2 = lexeme pIndex
 
 -- numeric_expression .
-pIndex :: Parser NumericExpression
+pIndex :: Parser Index
 pIndex = lexeme pNumericExpression
+
+-- simple_expression .
+--
+-- We consolidated 'expression' and 'simple_expression', so the burden of
+-- distinguishing the two now lays on the later stages of analysis.
+pNumericExpression :: Parser NumericExpression
+pNumericExpression = lexeme pExpression
